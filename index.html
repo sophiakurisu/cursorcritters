@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cursor Critters — garden sim</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="garden"></canvas>
+      <div id="hud">
+        <span class="pill" id="tick">t 0</span>
+        <span class="pill" id="seed">seed —</span>
+        <span class="pill" id="counts">—</span>
+        <span class="spacer"></span>
+        <button id="pause" title="Space">pause</button>
+        <button id="speed" title="cycle sim speed">1×</button>
+        <button id="reseed" title="new garden">reseed</button>
+        <label class="toggle"
+          ><input type="checkbox" id="labels" /> <span>labels</span></label
+        >
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
