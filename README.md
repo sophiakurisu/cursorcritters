@@ -49,6 +49,7 @@ shareable.
 | [`docs/DESIGN.md`](./docs/DESIGN.md) | What the game is — mechanics, races, missions, economy, and the reasoning behind each |
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | How it gets built — six gated phases and the extensibility contract |
 | [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) | The pre-registered balance experiment this repo currently serves |
+| [`docs/PHASE-0-PLAN.md`](./docs/PHASE-0-PLAN.md) | **The working build plan** — what gets done next, and in what order |
 
 ---
 
