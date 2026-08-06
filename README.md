@@ -50,6 +50,11 @@ shareable.
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | How it gets built — six gated phases and the extensibility contract |
 | [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) | The pre-registered balance experiment this repo currently serves |
 | [`docs/PHASE-0-PLAN.md`](./docs/PHASE-0-PLAN.md) | **The working build plan** — what gets done next, and in what order |
+| [`docs/GDD-COMPREHENSIVE.md`](./docs/GDD-COMPREHENSIVE.md) | The full 40-section design document — deepest reference on mechanics, maps, economy, UI and audio |
+
+`DESIGN.md` §0 reconciles the two design documents: what was adopted from the
+comprehensive GDD, where this project's spec still supersedes it, and the six
+open conflicts to settle before Phase 1.
 
 ---
 

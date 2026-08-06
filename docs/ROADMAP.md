@@ -96,13 +96,37 @@ produce — old replays would keep loading and quietly produce wrong results.
 
 So:
 
-- Replays are `{ simVersion, seed, inputLog, tuning }`.
+- Replays are `{ simVersion, configHash, seed, inputLog, checkpoints[] }`.
 - `SIM_VERSION` bumps on **any** behaviour change, enforced by a test that
   fingerprints a fixed seed and fails when it drifts without a version bump.
 - A version mismatch **refuses to load** rather than replaying wrongly.
 - Phase 0 results are always reported alongside the version that produced them.
 
 The existing `World.fingerprint()` is already the mechanism for this.
+
+**`configHash` and `checkpoints` are adopted from
+[GDD](./GDD-COMPREHENSIVE.md) §30.7.** The hash pins which *configuration*
+produced a run, not just which code — necessary once balance ships as config
+(Rule 8). Periodic state checkpoints allow seeking into a replay without
+re-simulating from tick zero, which stops mattering at 30-second gardens and
+starts mattering at ten-minute matches.
+
+### Rule 8 — Balance ships as versioned configuration, not code
+
+*Adopted from [GDD](./GDD-COMPREHENSIVE.md) §30.6.*
+
+Every match takes a versioned config: mode, map, seed, player limits, Seeker
+count, round duration, HP and damage, hunger rate, foreign timers, item counts,
+mission pool, sabotage pool, contraction sequence, **NPC density**, ranked flag.
+
+Two consequences worth stating:
+
+1. **Balance changes do not require a client patch** — the reason the GDD wants
+   this, and it holds from Phase 2 onward.
+2. **Phase 0's parameter sweep becomes a first-class runtime concept** rather
+   than a test-harness special case. `npcVariation` and NPC:hider ratio are
+   config fields from the start, so the thing being swept in the experiment is
+   literally the thing shipped later.
 
 ### Rule 6 — Feature flags
 
@@ -123,7 +147,7 @@ breaks an older client mid-season. No positional tuples in wire formats.
 |---|---|---|
 | **0** — 2D balance *(in progress)* | Does blending work at all? | Detection **30–70%** at some parameter set **and** hunts are fun |
 | **0.5** — Data-driven refactor | Will the codebase survive five phases? | Tests green; a 4th species is data-only |
-| **1** — Spikes / stack bake-off | Which stack; can we render 110 creatures? | Decision on measured numbers |
+| **1** — Spikes / stack bake-off | Which stack; can we render 110 creatures? | Decision on measured numbers. Absorbs [GDD](./GDD-COMPREHENSIVE.md) §35 Phase 0: networking, blob deformation, paint-mask and crowd-performance spikes, plus "blob morphing preserves a fixed hitbox" |
 | **2** — Vertical slice | Is it fun in 3D? | Testers ask to play again unprompted |
 | **3** — Playable alpha | 20 players, two seekers, real economy | 40–60% win rate both roles, ≥100 matches |
 | **4** — Content and modes | — | Infection, Triad Clash, maps 2–3, ranked |
@@ -166,6 +190,31 @@ tests. Prove it by actually doing it, then deleting it.
 
 - **Never pass a gate because the phase felt productive.** Gates are about
   evidence, not effort.
+### The crowd mechanism — NPC level-of-detail
+
+*Adopted from [GDD](./GDD-COMPREHENSIVE.md) §30.4–30.5.* Rendering and
+replicating ~90 NPCs is the binding constraint of spike 1a, and this is the
+answer to it:
+
+| Tier | State |
+|---|---|
+| **LOD 0** | full behaviour, navigation, animation, perception |
+| **LOD 1** | simplified state and path |
+| **LOD 2** | **statistical population representation** — no individuals at all |
+
+As a player approaches, the server **materialises valid individual NPC state out
+of the higher-level representation**. Replicate nearby players, nearby NPCs,
+projectiles and active interactions at high frequency; distant NPCs, schedule
+state and ambient crowd at low frequency.
+
+⚠️ **This interacts with determinism (Rule 5).** Materialising individuals from a
+statistical tier must be a deterministic function of `(seed, tick, region)`, or
+two clients — and a replay — will disagree about which critters exist. That is a
+Phase 1 design constraint, not a Phase 3 optimisation, and the 2D sim's
+per-critter independent RNG streams are the pattern to extend.
+
+### Sequencing
+
 - **Run spike 1a early and in parallel with Phase 0.** It needs no gameplay, and
   the rendering answer could change the NPC counts the whole design rests on.
 - **Everything before Phase 2 is disposable except the sim core.** The 2D

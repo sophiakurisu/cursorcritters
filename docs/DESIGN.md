@@ -1,14 +1,113 @@
 # Cursor Critters: Three Realms — full build spec
 
-> **Status: designed, Phase 0 in progress.** Supersedes the browser-prototype
-> framing. Written 2026-08-05.
+> **Status: designed, Phase 0 in progress.** Written 2026-08-05,
+> reconciled against the comprehensive GDD 2026-08-06.
 >
-> Working code: [`../cursor-critters/`](../src/) (2D NPC sim, Phase 0).
-> Balance protocol: [`CURSOR-CRITTERS-PROTOTYPE.md`](./PHASE-0-PROTOCOL.md).
+> Working code: [`../src/`](../src/) (2D NPC sim, Phase 0) ·
+> Balance protocol: [PHASE-0-PROTOCOL](./PHASE-0-PROTOCOL.md) ·
+> Build plan: [PHASE-0-PLAN](./PHASE-0-PLAN.md) ·
+> Architecture: [ROADMAP](./ROADMAP.md)
 >
 > This document merges Sophia's two design passes ("original" and "edited"),
 > records what changed between them and why, proposes additions, and lays out the
-> build in phases ordered by **risk retired**, not by feature.
+> build in phases ordered by **risk retired**, not by feature. §0 reconciles it
+> with the comprehensive GDD.
+
+---
+
+## 0. Reconciliation with the comprehensive GDD
+
+[`GDD-COMPREHENSIVE.md`](./GDD-COMPREHENSIVE.md) (3,212 lines, 40 sections) is
+now the most detailed artefact in the project. It was cross-checked against this
+spec on 2026-08-06.
+
+**It is more aligned than its own summary suggests.** §39 "Authoritative Baseline"
+lists the *original* braindump's raw quantities, which reads at first like a
+revert — but the body sections do carry the important fixes: the highlighter
+"must not function as an infallible human detector" (§10.1), the instability
+meter (§9.7), morphing requiring a morph point plus a vulnerable period plus
+server validation (§9.8), and the staged voice rollout (§9.5). Read the body, not
+§39.
+
+### 0.1 Adopted from the GDD
+
+| What | Where | Why it wins |
+|---|---|---|
+| **NPC level-of-detail tiers** — LOD 0 full behaviour, LOD 1 simplified state/path, LOD 2 *statistical population*, materialised into individuals as a player approaches | §30.5 | A concrete answer to the crowd cost that our own spike flagged as the binding constraint. We had the problem; this is the mechanism. **Folded into [ROADMAP](./ROADMAP.md).** |
+| **Versioned match configuration** — mode, seed, timers, damage, item counts, mission pool, NPC density, ranked flag; balance changes ship as config, not client patches | §30.6 | Strengthens extensibility Rule 2 (content as data) and makes the parameter sweep a first-class runtime concept rather than a test harness. |
+| **Replay format with config hash and periodic checkpoints** | §30.7 | Ours was `{simVersion, seed, inputLog}`. Checkpoints allow seeking without replaying from the start — necessary once matches are ten minutes long. |
+| **Explicit failure criteria** | §37 | We had gates for success and no articulation of what visible failure looks like. Now quoted in full at §0.4. |
+| **Good/poor mission design principles** | §15.2 | Notably lists "reveals every hider simultaneously with no ambiguity" as a *poor* mission — the same problem §3.1 here identifies. |
+| **MVP priority tiers** (must / should / could / later) | §36 | Cleaner cut-line vocabulary than our prose lists. |
+| **Instability meter stages** — 0–50% notice only, 50–75% symptoms, 75–100% impairment, then drain; neutral territory pauses it, home clears it faster | §9.7 | More precise than our "~45s to critical". Adopt verbatim. |
+| **Inventory as physical slots**, with large items visible on the body as a tell | §9.4 | Consistent with "no ability without a tell" and we did not have it. |
+
+### 0.2 Where this spec still supersedes the GDD
+
+**① The GDD has no cheap behavioural gate — this is the most important
+difference.** Its Phase 0 (§35) is four *technical* spikes: networking, blob
+deformation, paint mask, NPC crowd performance. Its Phase 1 exit criterion for
+the core question is *"Hiders can convincingly blend"* — a subjective judgement
+made during a 3D vertical slice, after months of work.
+
+The premise of this project is that blending works. [PHASE-0-PROTOCOL](./PHASE-0-PROTOCOL.md)
+measures it in 2D, with a pre-registered detection band, before any 3D exists.
+**Keep the 2D gate ahead of the GDD's Phase 0.** The GDD's spikes then become
+our Phase 1, which is where they belong.
+
+**② Schedule-aligned mission windows** (§3.1 below). The GDD identifies the
+simultaneity problem and solves it by *mission selection* — filter out missions
+that expose everyone at once. Ours solves it *structurally*: the window opens
+inside the matching NPC ritual, so doing the mission on time **is** blending. The
+GDD lists "join a scheduled race activity" as one easy mission; here it is the
+organising principle for all of them.
+
+**③ NPC-to-hider ratio of 5–9** (§3.2). The GDD makes NPC density a config knob
+(§30.6) but never proposes a value. This is the primary balance dial and it needs
+a starting number and a sweep.
+
+**④ Seeker coverage math** (§3.3). The GDD does not address whether one or two
+Seekers can meaningfully search three biomes inside ten minutes. Our compact
+territories, airship redeploy and contraction-as-funnel remain required.
+
+**⑤ The blend meter** (§3.6). The GDD lists *"custom bodies produce unavoidable
+tells"* as a failure condition (§37) without a mechanism to prevent it. The blend
+meter is that mechanism.
+
+**⑥ "No ability without a tell"** as a global rule (§2.2 ①), from the original
+plan's strength/tell table.
+
+**⑦ The extensibility contract and the `NpcBrain` seam** ([ROADMAP](./ROADMAP.md)) —
+what makes the GDD's own §33 AI-society future a brain swap rather than a rewrite.
+
+### 0.3 Open conflicts — decide before Phase 1
+
+| # | GDD | This spec | Note |
+|---|---|---|---|
+| 1 | **Mainstream 3D engine, C#, dedicated servers, region allocation, matchmaking + account services, object storage, RDBMS, analytics pipeline** (§30.1) | **Browser-first**, three.js + Colyseus/PartyKit, ~$15/mo, no ops | **The biggest open question.** The GDD describes a funded-studio architecture; ours is backed by measured .io evidence (Agar.io ~190 players/core; 600 entities in one PartyKit room). Different cost structures by orders of magnitude. Resolve at the spike-1a bake-off. |
+| 2 | 10-minute round (§39) | 8-minute slice | Ours is a *slice* value, GDD is the shipped target. Compatible. |
+| 3 | Contraction ~10% every 2 min (§39) | Staged elemental storm | Geometric shrink is hard to read in first person and can delete a race's territory. Keep the storm; check GDD §12 body text before treating this as settled. |
+| 4 | NPC removal: 3 per game / 20 s (§39) | 2 per game / 30 s | Minor. Killing is anti-social; the higher cost is likelier right. Playtest. |
+| 5 | Flat +50 / −25 / +30 (§39) | Separate Hider and Seeker ratings | Dying last to two strong Seekers is not the same as dying at minute one. Keep separate ratings. |
+| 6 | Morph every 45 s (§39) | Shrine-only, 5 s vulnerable | Largely reconciled — GDD §9.8 already requires a morph point, vulnerable period and server validation. Only the cadence differs. |
+
+### 0.4 Failure criteria (adopted verbatim from GDD §37)
+
+The prototype fails or needs a major pivot when:
+
+- Hiders win primarily by standing still.
+- Seekers clear crowds through random shooting.
+- One race is consistently obvious.
+- Custom bodies produce unavoidable tells.
+- Missions feel like chores unrelated to deception.
+- Hunger creates unavoidable losses.
+- Publicly useful information leaks through clients.
+- **First-person view makes camouflage incomprehensible.**
+- Matches routinely end with long periods of passive spectating.
+
+Two of these are already load-bearing here: the first-person one is why §3.7
+proposes a wide-FOV or third-person Seeker, and the passive-spectating one is why
+§3.4 promotes spectator-plus-replay into Phase 2.
 
 ---
 
