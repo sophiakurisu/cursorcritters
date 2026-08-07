@@ -12,9 +12,13 @@ import { HuntWorld, type Accusation } from "./hunt.js";
 
 const setupEl = document.querySelector<HTMLElement>("#setup")!;
 const hunterEl = document.querySelector<HTMLInputElement>("#hunter")!;
+const seedEl = document.querySelector<HTMLInputElement>("#seed")!;
+const fetchBtn = document.querySelector<HTMLButtonElement>("#fetch")!;
 const filesEl = document.querySelector<HTMLInputElement>("#files")!;
 const setupErrorEl = document.querySelector<HTMLElement>("#setup-error")!;
+const setupStatusEl = document.querySelector<HTMLElement>("#setup-status")!;
 const startBtn = document.querySelector<HTMLButtonElement>("#start")!;
+const sendReportBtn = document.querySelector<HTMLButtonElement>("#send-report")!;
 const canvas = document.querySelector<HTMLCanvasElement>("#garden")!;
 const hudEl = document.querySelector<HTMLElement>("#hud")!;
 const clockEl = document.querySelector<HTMLElement>("#clock")!;
@@ -44,22 +48,63 @@ let last = performance.now();
 let suspectId: number | null = null;
 const accused = new Set<number>();
 
+function acceptReplays(candidates: Replay[], source: string): void {
+  // Validate now, so a bad file fails at the door instead of mid-setup. This
+  // re-runs every session bit-for-bit — the server only shape-checks, the
+  // hunter's machine is where sessions are actually proven.
+  new HuntWorld(candidates);
+  replays = candidates;
+  startBtn.disabled = false;
+  setupStatusEl.textContent = `${candidates.length} session(s) ready (${source})`;
+  setupStatusEl.hidden = false;
+}
+
+function setupFailed(err: unknown): void {
+  setupErrorEl.textContent = err instanceof Error ? err.message : String(err);
+  setupErrorEl.hidden = false;
+  startBtn.disabled = true;
+}
+
 filesEl.addEventListener("change", async () => {
   setupErrorEl.hidden = true;
-  startBtn.disabled = true;
   const files = Array.from(filesEl.files ?? []);
   if (files.length === 0) return;
   try {
-    replays = await Promise.all(
-      files.map(async (f) => JSON.parse(await f.text()) as Replay)
+    acceptReplays(
+      await Promise.all(files.map(async (f) => JSON.parse(await f.text()) as Replay)),
+      "files"
     );
-    // Validate now, so a bad file fails at the door instead of mid-setup.
-    new HuntWorld(replays);
-    startBtn.disabled = false;
   } catch (err) {
-    setupErrorEl.textContent = err instanceof Error ? err.message : String(err);
-    setupErrorEl.hidden = false;
+    setupFailed(err);
   }
+});
+
+/** How many recorded humans a fetched hunt mixes in, given enough supply. */
+const FETCH_MIX = 3;
+
+// Pull same-seed sessions from the session store instead of passing files.
+fetchBtn.addEventListener("click", async () => {
+  setupErrorEl.hidden = true;
+  fetchBtn.disabled = true;
+  try {
+    const seed = seedEl.value.trim() || `daily-${new Date().toISOString().slice(0, 10)}`;
+    const listRes = await fetch(`/api/sessions/${encodeURIComponent(seed)}`);
+    if (!listRes.ok) throw new Error(`server said ${listRes.status}`);
+    const { sessions } = (await listRes.json()) as { sessions: { key: string }[] };
+    if (sessions.length === 0) throw new Error(`no sessions submitted for "${seed}" yet`);
+    const picked = [...sessions].sort(() => Math.random() - 0.5).slice(0, FETCH_MIX);
+    const fetched = await Promise.all(
+      picked.map(async (s) => {
+        const res = await fetch(`/api/session?k=${encodeURIComponent(s.key)}`);
+        if (!res.ok) throw new Error(`session fetch failed (${res.status})`);
+        return (await res.json()) as Replay;
+      })
+    );
+    acceptReplays(fetched, `server · ${seed}`);
+  } catch (err) {
+    setupFailed(err);
+  }
+  fetchBtn.disabled = false;
 });
 
 startBtn.addEventListener("click", () => {
@@ -199,6 +244,24 @@ function reveal(): void {
     revealListEl.append(li);
   }
 }
+
+// Ship the report home, so `pnpm analyze` can pull everything from /api/reports.
+sendReportBtn.addEventListener("click", async () => {
+  if (!hunt) return;
+  sendReportBtn.disabled = true;
+  sendReportBtn.textContent = "…";
+  try {
+    const res = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(hunt.report(hunterName())),
+    });
+    sendReportBtn.textContent = res.ok ? "sent ✓" : `✗ ${res.status}`;
+  } catch {
+    sendReportBtn.textContent = "✗ offline";
+    sendReportBtn.disabled = false;
+  }
+});
 
 reportBtn.addEventListener("click", () => {
   if (!hunt) return;

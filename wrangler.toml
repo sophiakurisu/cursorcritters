@@ -1,0 +1,9 @@
+# Cloudflare Pages config: static pages from dist/, API from functions/.
+# Deploy: pnpm build && npx wrangler pages deploy
+name = "cursorcritters"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-08-01"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "415fc96370734344ac7383292fc564bd"

@@ -26,12 +26,24 @@ or proves it doesn't, for the price of a fortnight instead of a year.
 Thresholds were pre-registered before any data and do not move:
 [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) §6.
 
-**All seven build steps (0.1–0.7) are done.** What remains is the experiment
-itself: `pnpm sweep plan` prints the collection grid as shareable URLs, Hiders
-play and `save`, `pnpm sweep hunts` turns the saves into hunt assignments
-across the NPC:hider-ratio axis, Hunters run them in `hunt.html`, and
-`pnpm analyze` reads the reports against the pre-registered thresholds. The
-protocol wants ≥20 hunt sessions and ≥60 judgements before the gate is read.
+**All seven build steps (0.1–0.7) are done, and the loop is deployed:**
+garden at [cursorcritters.pages.dev](https://cursorcritters.pages.dev/), hunt
+at [/hunt](https://cursorcritters.pages.dev/hunt), with a session-store API
+(Cloudflare Pages Functions + KV) behind them. The **today** button puts every
+player in the same shared garden (`daily-YYYY-MM-DD`); **submit** sends a
+played session to the server; the hunt page's **fetch today's garden** pulls
+up to three of them back as ghosts; the reveal's **submit report** ships the
+judgements home; `pnpm analyze https://cursorcritters.pages.dev` reads
+everything collected against the pre-registered thresholds. This is also the
+protocol §8 async daily — *"some of these critters were human yesterday; find
+them"* — catalogued as a minigame candidate in the MinigamesAI repo
+(`games/WHOS-HUMAN.md`).
+
+What remains is people: the protocol wants ≥20 hunt sessions and ≥60
+judgements before the gate is read. For the parameter sweep specifically,
+`pnpm sweep plan https://cursorcritters.pages.dev/` prints the collection
+grid as shareable URLs and `pnpm sweep hunts` plans hunts from downloaded
+saves across the NPC:hider-ratio axis.
 
 Step 0.5 is **the hunt** (`hunt.html`, linked from the garden page): load one
 or more saved sessions from the same seed, and watch them play back as ghosts

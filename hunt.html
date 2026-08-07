@@ -19,8 +19,14 @@
         <label>your name (for per-hunter stats):
           <input id="hunter" type="text" placeholder="anonymous" maxlength="40" />
         </label>
+        <div class="row">
+          <input id="seed" type="text" placeholder="daily-2026-08-07" maxlength="64" />
+          <button id="fetch">fetch today's garden</button>
+        </div>
+        <p>…or load session files by hand:</p>
         <input id="files" type="file" accept="application/json" multiple />
         <p id="setup-error" class="error" hidden></p>
+        <p id="setup-status" hidden></p>
         <button id="start" disabled>start the hunt</button>
       </div>
 
@@ -52,6 +58,7 @@
         <p id="reveal-summary"></p>
         <ul id="reveal-list"></ul>
         <div class="row">
+          <button id="send-report">submit report</button>
           <button id="report">download hunt report</button>
           <button id="again">hunt again</button>
         </div>

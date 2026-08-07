@@ -37,7 +37,9 @@ const goalEl = document.querySelector<HTMLElement>("#goal")!;
 const pauseBtn = document.querySelector<HTMLButtonElement>("#pause")!;
 const speedBtn = document.querySelector<HTMLButtonElement>("#speed")!;
 const reseedBtn = document.querySelector<HTMLButtonElement>("#reseed")!;
+const todayBtn = document.querySelector<HTMLButtonElement>("#today")!;
 const saveBtn = document.querySelector<HTMLButtonElement>("#save")!;
+const submitBtn = document.querySelector<HTMLButtonElement>("#submit")!;
 const labelsBox = document.querySelector<HTMLInputElement>("#labels")!;
 const playSel = document.querySelector<HTMLSelectElement>("#play")!;
 
@@ -221,6 +223,33 @@ saveBtn.addEventListener("click", () => {
   a.download = `critters-${world.seed}-v${replay.simVersion}-t${world.tick}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
+});
+
+/** The shared garden everyone plays on a given day — the async daily's pivot. */
+const dailySeed = (): string => `daily-${new Date().toISOString().slice(0, 10)}`;
+
+todayBtn.addEventListener("click", () => setWorld(dailySeed()));
+
+// Submit the session to the session store, so hunters can pull it without
+// passing files around. Requires the API (deployed site or `wrangler pages dev`).
+submitBtn.addEventListener("click", async () => {
+  submitBtn.disabled = true;
+  submitBtn.textContent = "…";
+  try {
+    const res = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(serialise(world)),
+    });
+    const out = (await res.json()) as { ok?: boolean; error?: string };
+    submitBtn.textContent = out.ok ? "sent ✓" : `✗ ${out.error ?? res.status}`;
+  } catch {
+    submitBtn.textContent = "✗ offline";
+  }
+  setTimeout(() => {
+    submitBtn.textContent = "submit";
+    submitBtn.disabled = false;
+  }, 2500);
 });
 
 labelsBox.addEventListener("change", () => {
