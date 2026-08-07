@@ -165,7 +165,7 @@ additions:
 | 0.3 ✅ | Schedule-aligned objectives (spec §3.1) |
 | 0.4 ✅ | **Versioned** record/replay (Rule 5) |
 | 0.5 ✅ | Hunt interface — watch, accuse, confidence |
-| 0.6 | Instrumentation — detection vs chance, false-positive rate, **tell inventory** |
+| 0.6 ✅ | Instrumentation — detection vs chance, false-positive rate, **tell inventory** |
 | 0.7 | Sweep `npcVariation` × **NPC:hider ratio** × objective pressure |
 
 ### Phase 0.5 — the data-driven refactor *(new)*

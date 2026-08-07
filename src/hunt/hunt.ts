@@ -73,6 +73,7 @@ export function extractTrack(replay: Replay): GhostTrack {
 export interface Accusation {
   tick: number;
   critterId: number;
+  species: Species;
   confidence: 1 | 2 | 3 | 4 | 5;
   wasHuman: boolean;
   /** The accused critter's recent behaviour, as verb runs — the tell inventory's raw material. */
@@ -83,6 +84,16 @@ export interface HuntReport {
   simVersion: number;
   seed: string;
   configHash: string;
+  /**
+   * Who hunted. Protocol §9: Hunter skill varies enormously — a novice and an
+   * expert must never be averaged into one number, so every report says whose
+   * judgements these are.
+   */
+  hunter: string;
+  /** The swept parameters this hunt ran under (protocol §4). */
+  npcVariation: number;
+  population: { ground: number; tree: number; water: number };
+  ghosts: { critterId: number; species: Species; objectivePressure: string }[];
   /** Critters in the garden and how many are ghosts: the chance baseline. */
   critterCount: number;
   humanCount: number;
@@ -207,17 +218,27 @@ export class HuntWorld {
     this.accusations.push({
       tick: this.world.tick,
       critterId,
+      species: critter.species,
       confidence,
       wasHuman: critter.isHuman,
       recentVerbs: runs(this.history.get(critterId) ?? []),
     });
   }
 
-  report(): HuntReport {
+  report(hunter = "anonymous"): HuntReport {
+    const config = this.replays[0]!.config;
     return {
       simVersion: SIM_VERSION,
       seed: this.world.seed,
       configHash: hashSeed(sceneKey(this.replays[0]!)).toString(16).padStart(8, "0"),
+      hunter,
+      npcVariation: config.tuning.npcVariation,
+      population: { ...config.population },
+      ghosts: this.replays.map((r, i) => ({
+        critterId: this.ghosts[i]!.id,
+        species: this.tracks[i]!.species,
+        objectivePressure: r.config.objectivePressure,
+      })),
       critterCount: this.critters.length,
       humanCount: this.ghosts.length,
       huntTicks: this.huntTicks,

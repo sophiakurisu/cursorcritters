@@ -125,7 +125,7 @@ protocol — two single-player sessions, no netcode, no concurrency.
 > into a downloadable hunt report. Startles are now logged and replayed, so a
 > startled recording still verifies.
 
-### 0.6 — Instrumentation
+### 0.6 — Instrumentation ✅ *(landed 2026-08-07 — `pnpm analyze <reports…>`)*
 
 - **Detection rate reported against chance** — 3 humans among 20 critters means
   random clicking scores ~15%. A raw percentage without the baseline is noise.
@@ -135,6 +135,14 @@ protocol — two single-player sessions, no netcode, no concurrency.
   the grammar, and it is publishable regardless of outcome.
 - Per-Hunter rates (skill varies enormously; do not average a novice and an
   expert into one number).
+
+> **As built** (`src/hunt/analyze.ts` + `scripts/analyze.ts`): hunt reports now
+> carry hunter id, npcVariation, population, and per-ghost species + pressure.
+> `pnpm analyze` aggregates them with the protocol's discipline hard-coded:
+> detection always printed against the judgement-weighted chance baseline,
+> 95% Wilson intervals on every rate, cells under n=30 print counts only,
+> per-hunter rates never pooled, confidence-vs-correctness, mean time to
+> detection, and the tell inventory verbatim. Mixed sim versions are refused.
 
 ### 0.7 — Parameter sweep
 

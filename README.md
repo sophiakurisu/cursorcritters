@@ -69,8 +69,9 @@ replays a session exactly (versioned serialisation is step 0.4).
 ```sh
 pnpm install
 pnpm dev        # watch the garden — or play in it
-pnpm test       # invariants (45)
+pnpm test       # invariants (52)
 pnpm baseline   # headless motion-baseline report
+pnpm analyze    # aggregate hunt reports into the protocol's metrics
 pnpm typecheck
 pnpm build
 ```

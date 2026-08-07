@@ -11,6 +11,7 @@ import { HuntWorld, type Accusation } from "./hunt.js";
  */
 
 const setupEl = document.querySelector<HTMLElement>("#setup")!;
+const hunterEl = document.querySelector<HTMLInputElement>("#hunter")!;
 const filesEl = document.querySelector<HTMLInputElement>("#files")!;
 const setupErrorEl = document.querySelector<HTMLElement>("#setup-error")!;
 const startBtn = document.querySelector<HTMLButtonElement>("#start")!;
@@ -169,6 +170,8 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("resize", () => hunt && renderer.resize(hunt.garden));
 
+const hunterName = (): string => hunterEl.value.trim() || "anonymous";
+
 function reveal(): void {
   if (!hunt) return;
   canvas.hidden = true;
@@ -176,7 +179,7 @@ function reveal(): void {
   accuseEl.hidden = true;
   revealEl.hidden = false;
 
-  const report = hunt.report();
+  const report = hunt.report(hunterName());
   const hits = report.accusations.filter((a) => a.wasHuman).length;
   const chance = report.humanCount / report.critterCount;
   revealSummaryEl.textContent =
@@ -199,7 +202,7 @@ function reveal(): void {
 
 reportBtn.addEventListener("click", () => {
   if (!hunt) return;
-  const blob = new Blob([JSON.stringify(hunt.report())], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(hunt.report(hunterName()))], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `hunt-${hunt.world.seed}-${Date.now()}.json`;
