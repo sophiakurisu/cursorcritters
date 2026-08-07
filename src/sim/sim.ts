@@ -1,7 +1,15 @@
 import { deriveRng, makeRng, type Rng } from "./rng.js";
 import { makeGarden } from "./garden.js";
 import { DEFAULT_TUNING, spawn, startle, stepCritter, TICK_HZ, type Tuning } from "./species.js";
-import type { Critter, Garden, Species } from "./types.js";
+import {
+  CHOOSABLE,
+  type Critter,
+  type Garden,
+  type HumanIntent,
+  type InputRecord,
+  type PlayerInput,
+  type Species,
+} from "./types.js";
 
 export { TICK_HZ };
 
@@ -17,6 +25,13 @@ export interface WorldConfig {
   seed: string;
   population?: Population;
   tuning?: Tuning;
+  /**
+   * Live human-controlled critters per species. Spawned after every NPC with
+   * their own derived streams, so a garden with humans has NPCs identical to
+   * the same-seed garden without them — the humans are the only difference,
+   * which is what makes A/B comparison and the hunt itself meaningful.
+   */
+  humans?: Partial<Population>;
 }
 
 /**
@@ -33,6 +48,15 @@ export class World {
   readonly tuning: Tuning;
   readonly seed: string;
   tick = 0;
+
+  /**
+   * Every applied player input, in order. `{seed, inputLog}` is the complete
+   * session: feed the same records back into `step()` at the same ticks on a
+   * fresh same-config world and it reproduces this one exactly. Inputs that
+   * were dropped at the door (wrong critter, verb outside the species'
+   * choosable set) are not recorded — the log is effects, not keypresses.
+   */
+  readonly inputLog: InputRecord[] = [];
 
   /** One independent stream per critter, so populations stay comparable. */
   private readonly streams: Rng[] = [];
@@ -60,14 +84,45 @@ export class World {
     add("ground", population.ground);
     add("tree", population.tree);
     add("water", population.water);
+
+    const humans = config.humans ?? {};
+    const addHuman = (species: Species, count: number) => {
+      for (let i = 0; i < count; i++) {
+        const rng = deriveRng(config.seed, `human:${species}`, i);
+        this.streams.push(rng);
+        this.critters.push(spawn(id, species, this.garden, rng, id, true));
+        id++;
+      }
+    };
+    addHuman("ground", humans.ground ?? 0);
+    addHuman("tree", humans.tree ?? 0);
+    addHuman("water", humans.water ?? 0);
   }
 
-  step(): void {
+  step(inputs?: readonly PlayerInput[]): void {
     this.tick++;
+    if (inputs) for (const input of inputs) this.apply(input);
     for (const c of this.critters) {
       const rng = this.streams[c.rngIndex];
       if (rng) stepCritter(c, this.garden, rng, this.tuning);
     }
+  }
+
+  /**
+   * Queue an intent on a live human critter, to be consumed at its next choice
+   * point. Latest wins if several arrive before one. Verbs outside the species'
+   * choosable set are dropped here; whether the intent is legal *now* (can I
+   * pick fruit from the ground?) is judged where an NPC would be choosing.
+   */
+  private apply({ critterId, intent }: PlayerInput): void {
+    const c = this.critters.find((k) => k.id === critterId);
+    if (!c || !c.isHuman) return;
+    if (!CHOOSABLE[c.species].includes(intent.verb)) return;
+    const copy: HumanIntent = { verb: intent.verb };
+    if (intent.target) copy.target = { x: intent.target.x, y: intent.target.y };
+    if (intent.treeIndex !== undefined) copy.treeIndex = intent.treeIndex;
+    c.pendingIntent = copy;
+    this.inputLog.push({ tick: this.tick, critterId, intent: copy });
   }
 
   /** Scatter ground critters near a point. Used by the dev harness only. */

@@ -38,6 +38,56 @@ export const GRAMMAR: Record<Species, readonly Verb[]> = {
   water: ["swim", "dive", "surface", "drift"],
 };
 
+/**
+ * The verbs a player may *ask for*, per species — the choosable subset of the
+ * grammar. Reflexes (flee) and automatic links (climb after arriving at a tree,
+ * perch after climbing, surface after a dive) are the sim's to issue, for
+ * humans and NPCs alike; a player who could trigger them directly would have a
+ * motion no NPC's state machine can produce.
+ */
+export const CHOOSABLE: Record<Species, readonly Verb[]> = {
+  ground: ["walk", "graze", "idle"],
+  tree: ["walk", "pickFruit", "drop"],
+  water: ["swim", "drift", "dive"],
+};
+
+/**
+ * A verb the player asks their critter to perform.
+ *
+ * Consumed at the critter's next *choice point* — the exact moment an NPC would
+ * consult its weighted verb table — never mid-verb. The player chooses which
+ * verb, when, and where; speeds, durations and the transitions between verbs
+ * are the sim's, executed by the same code NPCs run. An intent that is illegal
+ * for the species or the current state is dropped, and the critter behaves as
+ * if the player had done nothing.
+ */
+export interface HumanIntent {
+  verb: Verb;
+  /**
+   * Travel destination (ground `walk` / water `swim`). Never trusted: the sim
+   * legalises it into the same distribution NPC targets are drawn from, or
+   * rejects it. See `human.ts`.
+   */
+  target?: Vec;
+  /** Destination tree (tree-species `walk`). Must be one an NPC could pick. */
+  treeIndex?: number;
+}
+
+/** One player input, as fed to `World.step()`. */
+export interface PlayerInput {
+  critterId: number;
+  intent: HumanIntent;
+}
+
+/**
+ * A player input as recorded in the world's input log. `{seed, inputLog}` is
+ * the whole session: replaying the log through a fresh world with the same
+ * seed reproduces it exactly.
+ */
+export interface InputRecord extends PlayerInput {
+  tick: number;
+}
+
 export interface Tree {
   pos: Vec;
   /** Canopy radius; critters perch within it. */
@@ -92,4 +142,10 @@ export interface Critter {
   temperament: number;
   /** Per-critter deterministic stream. */
   rngIndex: number;
+  /**
+   * The player's queued intent, if this is a live human critter. Set by
+   * `World.step(inputs)`, consumed (valid or not) at the next choice point.
+   * Always null on NPCs.
+   */
+  pendingIntent: HumanIntent | null;
 }

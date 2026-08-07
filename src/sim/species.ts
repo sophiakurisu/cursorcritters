@@ -8,7 +8,8 @@ import {
   randomTreeIndex,
   treeBase,
 } from "./garden.js";
-import type { Critter, Garden, Species, Verb } from "./types.js";
+import { legalGroundTarget, legalPondTarget, legalTreeIndex } from "./human.js";
+import type { Critter, Garden, HumanIntent, Species, Verb } from "./types.js";
 
 export const TICK_HZ = 30;
 
@@ -103,6 +104,31 @@ function enter(c: Critter, verb: Verb, timer: number, target: { x: number; y: nu
 const restless = (c: Critter): boolean => c.sinceTravel > MAX_SETTLED;
 
 /**
+ * Take (and clear) the player's queued intent. Every choice point drains the
+ * queue exactly once, valid or not — a stale request must not fire minutes
+ * later at some unrelated choice point.
+ */
+function takeIntent(c: Critter): HumanIntent | null {
+  const intent = c.pendingIntent;
+  c.pendingIntent = null;
+  return intent;
+}
+
+// Shared entries for verbs both an NPC chooser and a human intent can select.
+// One definition each, so their durations cannot drift apart between the two
+// paths — a human graze must be drawn from the same distribution as an NPC's.
+const enterIdle = (c: Critter, rng: Rng, t: Tuning): void =>
+  enter(c, "idle", hold(rng, secs(1.4), secs(1.0), t));
+const enterGraze = (c: Critter, rng: Rng, t: Tuning): void =>
+  enter(c, "graze", hold(rng, secs(3.2), secs(1.8), t));
+const enterPickFruit = (c: Critter, rng: Rng, t: Tuning): void =>
+  enter(c, "pickFruit", hold(rng, secs(1.6), secs(0.5), t));
+const enterDrift = (c: Critter, rng: Rng, t: Tuning): void =>
+  enter(c, "drift", hold(rng, secs(2.8), secs(1.6), t));
+const enterDive = (c: Critter, rng: Rng, t: Tuning): void =>
+  enter(c, "dive", hold(rng, secs(1.8), secs(1.0), t));
+
+/**
  * Bends the base verb weights toward this critter's temperament.
  *
  * At npcVariation 0 an individual is highly consistent — it reliably favours its
@@ -143,13 +169,35 @@ function stepGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
 }
 
 function chooseGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+  if (c.isHuman) return humanChooseGround(c, g, rng, t);
   // Aimless by construction: the target is a random point, never a goal. A human
   // pursuing an objective moves purposefully, and that is the whole tell.
   const options = ["walk", "graze", "idle"] as const;
   const verb = restless(c) ? "walk" : rng.weighted<Verb>(options, biased(c, options, [0.34, 0.44, 0.22], t));
   if (verb === "walk") enter(c, "walk", MAX_JOURNEY, randomGrassPoint(g, rng, c.pos, HOP.ground));
-  else if (verb === "graze") enter(c, "graze", hold(rng, secs(3.2), secs(1.8), t));
-  else enter(c, "idle", hold(rng, secs(1.4), secs(1.0), t));
+  else if (verb === "graze") enterGraze(c, rng, t);
+  else enterIdle(c, rng, t);
+}
+
+/**
+ * The human's version of the choice point above. The player consumes their
+ * queued intent instead of a weighted table; execution, speeds and durations
+ * are identical. No valid intent → a neutral idle, so doing nothing is itself
+ * visible behaviour: the restless clock never forces a human to travel, and
+ * standing still past the NPC baseline is precisely the kind of tell the
+ * experiment exists to measure.
+ */
+function humanChooseGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+  const intent = takeIntent(c);
+  if (intent) {
+    if (intent.verb === "walk" && intent.target) {
+      const target = legalGroundTarget(g, c.pos, intent.target, HOP.ground);
+      if (target) return enter(c, "walk", MAX_JOURNEY, target);
+    } else if (intent.verb === "graze") {
+      return enterGraze(c, rng, t);
+    }
+  }
+  enterIdle(c, rng, t);
 }
 
 // ===========================================================================
@@ -179,12 +227,13 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
     }
     case "perch": {
       if (--c.timer <= 0) {
+        if (c.isHuman) return humanChoosePerch(c, rng, t);
         // No perch→perch: chaining it left critters frozen for 25s at a stretch.
         // The restless clock then bounds the perch↔pickFruit cycle, which could
         // otherwise keep a critter in one tree indefinitely.
         const options = ["pickFruit", "drop"] as const;
         const verb = restless(c) ? "drop" : rng.weighted<Verb>(options, biased(c, options, [0.58, 0.42], t));
-        if (verb === "pickFruit") enter(c, "pickFruit", hold(rng, secs(1.6), secs(0.5), t));
+        if (verb === "pickFruit") enterPickFruit(c, rng, t);
         else enter(c, "drop", secs(1));
       }
       return;
@@ -203,6 +252,7 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
     case "drop": {
       c.elevation = Math.max(0, c.elevation - SPEED.drop);
       if (c.elevation <= 0) {
+        if (c.isHuman) return humanChooseTreeGround(c, g, rng, t);
         const next = nearbyTreeIndex(g, rng, c.pos, c.treeIndex);
         c.treeIndex = next;
         enter(c, "walk", MAX_JOURNEY, next >= 0 ? treeBase(g, next, rng) : randomGrassPoint(g, rng, c.pos));
@@ -211,12 +261,49 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
     }
     default: {
       if (--c.timer <= 0) {
+        if (c.isHuman) return humanChooseTreeGround(c, g, rng, t);
         const next = c.treeIndex >= 0 ? c.treeIndex : randomTreeIndex(g, rng);
         c.treeIndex = next;
         enter(c, "walk", MAX_JOURNEY, next >= 0 ? treeBase(g, next, rng) : randomGrassPoint(g, rng, c.pos));
       }
     }
   }
+}
+
+/**
+ * Human choice point at the top of a tree, when a perch runs out. NPCs must
+ * pick fruit or drop; the player may too — or do nothing and perch again. No
+ * NPC ever chains perch→perch, so an idle player gradually reads as frozen.
+ * That is not an affordance leak: stillness is a behavioural tell, and it must
+ * remain available for the experiment to measure it.
+ */
+function humanChoosePerch(c: Critter, rng: Rng, t: Tuning): void {
+  const intent = takeIntent(c);
+  if (intent?.verb === "pickFruit") return enterPickFruit(c, rng, t);
+  if (intent?.verb === "drop") return enter(c, "drop", secs(1));
+  enter(c, "perch", hold(rng, secs(2.6), secs(1.6), t));
+}
+
+/**
+ * Human choice point at ground level (after a drop, or when the spawn idle runs
+ * out). The player may walk to any tree an NPC could legally pick — the current
+ * one or a near neighbour. With no valid intent the critter walks to a nearby
+ * tree exactly as an NPC would: tree critters never loiter on the grass, and
+ * neither may the player.
+ */
+function humanChooseTreeGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+  const intent = takeIntent(c);
+  if (
+    intent?.verb === "walk" &&
+    intent.treeIndex !== undefined &&
+    legalTreeIndex(g, c.pos, c.treeIndex, intent.treeIndex)
+  ) {
+    c.treeIndex = intent.treeIndex;
+    return enter(c, "walk", MAX_JOURNEY, treeBase(g, intent.treeIndex, rng));
+  }
+  const next = nearbyTreeIndex(g, rng, c.pos, c.treeIndex);
+  c.treeIndex = next;
+  enter(c, "walk", MAX_JOURNEY, next >= 0 ? treeBase(g, next, rng) : randomGrassPoint(g, rng, c.pos));
 }
 
 // ===========================================================================
@@ -267,11 +354,28 @@ function clampToPond(c: Critter, g: Garden): void {
 }
 
 function chooseWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+  if (c.isHuman) return humanChooseWater(c, g, rng, t);
   const options = ["swim", "drift", "dive"] as const;
   const verb = restless(c) ? "swim" : rng.weighted<Verb>(options, biased(c, options, [0.44, 0.34, 0.22], t));
   if (verb === "swim") enter(c, "swim", MAX_JOURNEY, randomPondPoint(g, rng));
-  else if (verb === "drift") enter(c, "drift", hold(rng, secs(2.8), secs(1.6), t));
-  else enter(c, "dive", hold(rng, secs(1.8), secs(1.0), t));
+  else if (verb === "drift") enterDrift(c, rng, t);
+  else enterDive(c, rng, t);
+}
+
+/** Human choice point in the pond. Neutral fallback is a drift — NPCs chain
+ * drifts legally, so an idle water player is the best-hidden of the three,
+ * bounded only by the restless clock they conspicuously never answer. */
+function humanChooseWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+  const intent = takeIntent(c);
+  if (intent) {
+    if (intent.verb === "swim" && intent.target) {
+      const target = legalPondTarget(g, intent.target);
+      if (target) return enter(c, "swim", MAX_JOURNEY, target);
+    } else if (intent.verb === "dive") {
+      return enterDive(c, rng, t);
+    }
+  }
+  enterDrift(c, rng, t);
 }
 
 // ===========================================================================
@@ -283,12 +387,21 @@ export function stepCritter(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
   else stepWater(c, g, rng, t);
 }
 
-/** Startup state for a fresh NPC, placed in its species' home terrain. */
-export function spawn(id: number, species: Species, g: Garden, rng: Rng, rngIndex: number): Critter {
+/** Startup state for a fresh critter, placed in its species' home terrain.
+ * A human spawns exactly as an NPC does — same verb, same stagger — and only
+ * diverges once the player starts answering choice points. */
+export function spawn(
+  id: number,
+  species: Species,
+  g: Garden,
+  rng: Rng,
+  rngIndex: number,
+  isHuman = false
+): Critter {
   const base: Critter = {
     id,
     species,
-    isHuman: false,
+    isHuman,
     pos: { x: 0, y: 0 },
     heading: rng.range(0, Math.PI * 2),
     verb: "idle",
@@ -301,6 +414,7 @@ export function spawn(id: number, species: Species, g: Garden, rng: Rng, rngInde
     sinceTravel: rng.int(MAX_SETTLED),
     temperament: rng.int(6),
     rngIndex,
+    pendingIntent: null,
   };
 
   if (species === "ground") {

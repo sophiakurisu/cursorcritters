@@ -158,13 +158,22 @@ export function randomTreeIndex(garden: Garden, rng: Rng, exclude = -1): number 
  * Short hops between neighbours read as foraging and keep the canopy busy.
  */
 export function nearbyTreeIndex(garden: Garden, rng: Rng, from: Vec, exclude = -1, k = 3): number {
-  const candidates = garden.trees
+  const candidates = nearbyTreeCandidates(garden, from, exclude, k);
+  if (candidates.length === 0) return exclude >= 0 ? exclude : 0;
+  return candidates[rng.int(candidates.length)]!;
+}
+
+/**
+ * The candidate set `nearbyTreeIndex` draws from, exposed so a human player's
+ * chosen tree can be validated against exactly the trees an NPC could pick.
+ */
+export function nearbyTreeCandidates(garden: Garden, from: Vec, exclude = -1, k = 3): number[] {
+  return garden.trees
     .map((t, i) => ({ i, d: dist(t.pos, from) }))
     .filter((c) => c.i !== exclude)
     .sort((a, b) => a.d - b.d)
-    .slice(0, k);
-  if (candidates.length === 0) return exclude >= 0 ? exclude : 0;
-  return candidates[rng.int(candidates.length)]!.i;
+    .slice(0, k)
+    .map((c) => c.i);
 }
 
 /** A point on the ground at the base of a tree, offset so critters don't stack. */

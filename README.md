@@ -26,10 +26,22 @@ or proves it doesn't, for the price of a fortnight instead of a year.
 Thresholds were pre-registered before any data and do not move:
 [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) §6.
 
+Step 0.2 is done too: a **playable critter**. Pick a species from the `play`
+selector (or `#play=ground|tree|water` in the URL) and you control one critter —
+restricted to its species' verb set, issued through the exact state machine the
+NPCs run. Clicks and hotkeys queue an *intent*, consumed at the critter's next
+choice point — the moment an NPC would consult its weighted verb table — and the
+sim legalises every travel target into the same distribution NPC targets are
+drawn from, or drops it. The only human freedoms are which verb, when, and
+where; that constraint is what makes the eventual hunt measure behaviour rather
+than input affordance, and `test/human.test.ts` enforces it under hostile input.
+Every applied input lands in `World.inputLog`, so `{seed, inputLog}` already
+replays a session exactly (versioned serialisation is step 0.4).
+
 ```sh
 pnpm install
-pnpm dev        # watch the garden
-pnpm test       # invariants (11)
+pnpm dev        # watch the garden — or play in it
+pnpm test       # invariants (22)
 pnpm baseline   # headless motion-baseline report
 pnpm typecheck
 pnpm build
@@ -39,6 +51,13 @@ pnpm build
 for a new garden · **labels** draws each critter's current verb · **click** to
 startle nearby ground critters. The seed lives in the URL hash, so a garden is
 shareable.
+
+While playing: **click** walks/swims toward the point (tree critters click a
+canopy instead), **G** graze · **I** idle · **F** pick fruit · **D** drop ·
+**V** dive · **R** drift — only the verbs your species owns do anything —
+and **shift-click** keeps the startle. The HUD shows your current verb and the
+queued intent; doing nothing is itself visible behaviour, because the restless
+clock that forces NPCs to travel never forces you.
 
 ---
 

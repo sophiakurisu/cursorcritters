@@ -1,49 +1,96 @@
 import "./style.css";
 import { Renderer } from "./render/render.js";
 import { TICK_HZ, World } from "./sim/sim.js";
+import { CHOOSABLE, SPECIES, type PlayerInput, type Species, type Verb } from "./sim/types.js";
 
 /**
- * Dev harness for the smoke test (prototype spec §7 step 1): build the NPC sim
- * alone and watch it. Before recruiting anyone, the question is whether the
- * garden reads as a living place with three distinguishable rhythms.
+ * Dev harness, two modes:
  *
- * No humans, no hunting, no recording yet.
+ * - **watch** — the original smoke test (prototype spec §7 step 1): the NPC
+ *   garden alone, click to startle.
+ * - **play** (step 0.2) — control one critter of a chosen species, restricted
+ *   to its species' verb set. Click issues travel, hotkeys issue the other
+ *   choosable verbs, and every input runs through the same state machine as
+ *   the NPCs — queued at the next choice point, legalised or dropped by the
+ *   sim. The only human freedoms are which verb, when, and where.
+ *
+ * The "you" ring is a dev affordance; the hunt interface (step 0.5) must not
+ * have one.
  */
 
 const canvas = document.querySelector<HTMLCanvasElement>("#garden")!;
 const tickEl = document.querySelector<HTMLElement>("#tick")!;
 const seedEl = document.querySelector<HTMLElement>("#seed")!;
 const countsEl = document.querySelector<HTMLElement>("#counts")!;
+const youEl = document.querySelector<HTMLElement>("#you")!;
 const pauseBtn = document.querySelector<HTMLButtonElement>("#pause")!;
 const speedBtn = document.querySelector<HTMLButtonElement>("#speed")!;
 const reseedBtn = document.querySelector<HTMLButtonElement>("#reseed")!;
 const labelsBox = document.querySelector<HTMLInputElement>("#labels")!;
+const playSel = document.querySelector<HTMLSelectElement>("#play")!;
 
 const SPEEDS = [1, 2, 4, 0.25] as const;
 const STEP_MS = 1000 / TICK_HZ;
 /** Guard against the spiral-of-death after a background tab or a long stall. */
 const MAX_CATCHUP_STEPS = 8;
 
+/** Stationary-verb hotkeys. The sim drops any that are wrong for the species. */
+const HOTKEYS: Record<string, Verb> = {
+  KeyG: "graze",
+  KeyI: "idle",
+  KeyF: "pickFruit",
+  KeyD: "drop",
+  KeyV: "dive",
+  KeyR: "drift",
+};
+
 const renderer = new Renderer(canvas);
-let world = new World({ seed: seedFromUrl() });
+let playSpecies: Species | null = playFromUrl();
+/** Inputs gathered since the last sim step; drained into the first step of each frame. */
+const pendingInputs: PlayerInput[] = [];
+let world = makeWorld(seedFromUrl());
 let paused = false;
 let speedIndex = 0;
 let accumulator = 0;
 let last = performance.now();
 
+function hashParams(): URLSearchParams {
+  return new URLSearchParams(location.hash.slice(1));
+}
+
 function seedFromUrl(): string {
-  const fromHash = new URLSearchParams(location.hash.slice(1)).get("seed");
+  const fromHash = hashParams().get("seed");
   return fromHash && fromHash.trim() ? fromHash.trim() : "garden-01";
 }
 
-function setSeed(seed: string): void {
-  world = new World({ seed });
+function playFromUrl(): Species | null {
+  const v = hashParams().get("play") ?? "";
+  return (SPECIES as readonly string[]).includes(v) ? (v as Species) : null;
+}
+
+function makeWorld(seed: string): World {
+  const humans: Partial<Record<Species, number>> = {};
+  if (playSpecies) humans[playSpecies] = 1;
+  const w = new World({ seed, humans });
+  renderer.highlightId = w.critters.find((c) => c.isHuman)?.id ?? null;
+  pendingInputs.length = 0;
+  return w;
+}
+
+function setWorld(seed: string): void {
+  world = makeWorld(seed);
   accumulator = 0;
-  const params = new URLSearchParams(location.hash.slice(1));
+  const params = hashParams();
   params.set("seed", seed);
+  if (playSpecies) params.set("play", playSpecies);
+  else params.delete("play");
   history.replaceState(null, "", `#${params.toString()}`);
   renderer.resize(world.garden);
   refreshHud();
+}
+
+function me(): ReturnType<World["critters"]["find"]> {
+  return world.critters.find((c) => c.isHuman);
 }
 
 function refreshHud(): void {
@@ -51,6 +98,9 @@ function refreshHud(): void {
   tickEl.textContent = `t ${world.tick}`;
   seedEl.textContent = `seed ${world.seed}`;
   countsEl.textContent = `${c.ground} ground · ${c.tree} tree · ${c.water} water`;
+  const m = me();
+  youEl.hidden = !m;
+  if (m) youEl.textContent = `you: ${m.verb}${m.pendingIntent ? ` → ${m.pendingIntent.verb}` : ""}`;
 }
 
 function frame(now: number): void {
@@ -61,7 +111,8 @@ function frame(now: number): void {
     accumulator += elapsed * SPEEDS[speedIndex]!;
     let steps = 0;
     while (accumulator >= STEP_MS && steps < MAX_CATCHUP_STEPS) {
-      world.step();
+      // splice drains the queue into the first step; later steps get nothing.
+      world.step(pendingInputs.splice(0));
       accumulator -= STEP_MS;
       steps++;
     }
@@ -71,7 +122,7 @@ function frame(now: number): void {
   }
 
   renderer.draw(world);
-  if (world.tick % 6 === 0) refreshHud();
+  if (world.tick % 6 === 0 || pendingInputs.length > 0) refreshHud();
   requestAnimationFrame(frame);
 }
 
@@ -86,31 +137,73 @@ speedBtn.addEventListener("click", () => {
 });
 
 reseedBtn.addEventListener("click", () => {
-  setSeed(`garden-${Math.floor(Math.random() * 9000 + 1000)}`);
+  setWorld(`garden-${Math.floor(Math.random() * 9000 + 1000)}`);
 });
 
 labelsBox.addEventListener("change", () => {
   renderer.showLabels = labelsBox.checked;
 });
 
-// Click to startle: the only reactive behaviour, and a quick way to see whether
-// a disturbance reads differently from ordinary wandering.
+playSel.addEventListener("change", () => {
+  const v = playSel.value;
+  playSpecies = (SPECIES as readonly string[]).includes(v) ? (v as Species) : null;
+  setWorld(world.seed);
+  playSel.blur();
+});
+
+// In watch mode a click startles; in play mode it commands your critter and
+// shift-click keeps the startle (the disturbance is worth studying while
+// playing — fleeing with the herd is the blend, watching it is the tell).
 canvas.addEventListener("pointerdown", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width) * world.garden.width;
   const y = ((e.clientY - rect.top) / rect.height) * world.garden.height;
-  world.startleAt(x, y);
+
+  const m = me();
+  if (!playSpecies || !m || e.shiftKey) {
+    world.startleAt(x, y);
+    return;
+  }
+
+  if (playSpecies === "tree") {
+    // Click a canopy to head for that tree. Legality (is it one an NPC could
+    // pick from here?) is the sim's call, not ours.
+    let best = -1;
+    let bestD = Infinity;
+    world.garden.trees.forEach((tree, i) => {
+      const d = Math.hypot(tree.pos.x - x, tree.pos.y - y);
+      if (d < tree.radius + 14 && d < bestD) {
+        best = i;
+        bestD = d;
+      }
+    });
+    if (best >= 0) pendingInputs.push({ critterId: m.id, intent: { verb: "walk", treeIndex: best } });
+  } else if (playSpecies === "water") {
+    pendingInputs.push({ critterId: m.id, intent: { verb: "swim", target: { x, y } } });
+  } else {
+    pendingInputs.push({ critterId: m.id, intent: { verb: "walk", target: { x, y } } });
+  }
 });
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     e.preventDefault();
     pauseBtn.click();
+    return;
   }
+  const verb = HOTKEYS[e.code];
+  if (!verb || !playSpecies) return;
+  if (!CHOOSABLE[playSpecies].includes(verb)) return;
+  const m = me();
+  if (m) pendingInputs.push({ critterId: m.id, intent: { verb } });
 });
 
 window.addEventListener("resize", () => renderer.resize(world.garden));
 
+// Console access to live state, for poking at a session while it runs.
+if (import.meta.env.DEV) (window as unknown as { __world: () => World }).__world = () => world;
+
+playSel.value = playSpecies ?? "off";
 renderer.resize(world.garden);
 refreshHud();
 requestAnimationFrame(frame);

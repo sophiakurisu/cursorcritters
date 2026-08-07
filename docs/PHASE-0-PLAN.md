@@ -37,9 +37,18 @@ findable but not trivially findable? Pre-registered thresholds:
 **30–70% detection = healthy**, at chance (~15%) = the design fails, >70% =
 hiding is pointless. Written before data; they do not move.
 
-### 0.2 — Human-controlled critter
+### 0.2 — Human-controlled critter ✅ *(landed 2026-08-06)*
 
 A player controls one critter, **restricted to its species' verb set**.
+
+> **As built:** intents (`HumanIntent`) queue via `World.step(inputs)` and are
+> consumed at the critter's next *choice point* — the moment an NPC would roll
+> its weighted table — never mid-verb. Travel targets are legalised in
+> `src/sim/human.ts` into the exact support NPC targets are drawn from (hop
+> range, tree-neighbour candidates, pond rim) or dropped. Durations come from
+> the same distributions via the human's own RNG stream. Applied inputs land in
+> `World.inputLog`; `{seed, inputLog}` replays exactly (tested). Hostile-input
+> containment tests live in `test/human.test.ts`.
 
 > ⚠️ **The hardest constraint in the whole prototype.** If a human can produce
 > any motion an NPC cannot, the hunt measures *input affordance* rather than
@@ -198,8 +207,10 @@ the mechanical form of "the sim is a pure function" and should get a lint rule.
 
 ## Open questions
 
-1. **Human input model** (0.2) — click-to-target is proposed; it must not grant
-   motion NPCs lack, and that is easy to get subtly wrong.
+1. ~~**Human input model** (0.2)~~ — settled: click-to-target with sim-side
+   legalisation (see 0.2 as-built note). One consequence worth knowing: a click
+   the sim cannot legalise is *silently* dropped, which reads as unresponsive.
+   Fine for self-testing; revisit feedback before recruiting Hiders.
 2. **How many Hunters** to recruit before the sweep is meaningful; the protocol
    says ≥20 hunt sessions and ≥60 judgements.
 3. Whether the objective set is large enough for the tell inventory to

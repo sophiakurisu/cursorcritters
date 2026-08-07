@@ -106,3 +106,14 @@ button:active {
 .toggle input {
   accent-color: #7fa653;
 }
+
+.toggle select {
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 6px;
+  cursor: pointer;
+}

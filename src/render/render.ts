@@ -28,6 +28,11 @@ export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private dpr = 1;
   showLabels = false;
+  /**
+   * Critter to ring-mark as "you" in play mode. Dev harness only — the hunt
+   * interface must never set this, or there is nothing to hunt.
+   */
+  highlightId: number | null = null;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
@@ -68,6 +73,31 @@ export class Renderer {
     this.drawTrees(garden);
     for (const c of high) this.drawCritter(c);
 
+    if (this.highlightId !== null) {
+      const me = world.critters.find((c) => c.id === this.highlightId);
+      if (me) this.drawHighlight(me);
+    }
+
+    ctx.restore();
+  }
+
+  /** Dashed "you" ring plus, mid-journey, a small target marker. */
+  private drawHighlight(c: Critter): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(c.pos.x, c.pos.y, 16, 0, Math.PI * 2);
+    ctx.stroke();
+    if (c.target && (c.verb === "walk" || c.verb === "swim")) {
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath();
+      ctx.arc(c.target.x, c.target.y, 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
