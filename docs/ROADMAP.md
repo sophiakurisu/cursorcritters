@@ -166,7 +166,7 @@ additions:
 | 0.4 ✅ | **Versioned** record/replay (Rule 5) |
 | 0.5 ✅ | Hunt interface — watch, accuse, confidence |
 | 0.6 ✅ | Instrumentation — detection vs chance, false-positive rate, **tell inventory** |
-| 0.7 | Sweep `npcVariation` × **NPC:hider ratio** × objective pressure |
+| 0.7 ✅ | Sweep `npcVariation` × **NPC:hider ratio** × objective pressure *(tooling — the gate now needs human data)* |
 
 ### Phase 0.5 — the data-driven refactor *(new)*
 

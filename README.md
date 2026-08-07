@@ -11,7 +11,7 @@ Missions force you to break pattern. The map contracts. Somebody notices.
 
 ---
 
-## Status: **Phase 0**
+## Status: **Phase 0 — built; collecting**
 
 This repository currently contains a **2D deterministic NPC simulation**, not the
 game. It exists to answer one question before any 3D work begins:
@@ -25,6 +25,13 @@ or proves it doesn't, for the price of a fortnight instead of a year.
 
 Thresholds were pre-registered before any data and do not move:
 [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) §6.
+
+**All seven build steps (0.1–0.7) are done.** What remains is the experiment
+itself: `pnpm sweep plan` prints the collection grid as shareable URLs, Hiders
+play and `save`, `pnpm sweep hunts` turns the saves into hunt assignments
+across the NPC:hider-ratio axis, Hunters run them in `hunt.html`, and
+`pnpm analyze` reads the reports against the pre-registered thresholds. The
+protocol wants ≥20 hunt sessions and ≥60 judgements before the gate is read.
 
 Step 0.5 is **the hunt** (`hunt.html`, linked from the garden page): load one
 or more saved sessions from the same seed, and watch them play back as ghosts
@@ -69,9 +76,10 @@ replays a session exactly (versioned serialisation is step 0.4).
 ```sh
 pnpm install
 pnpm dev        # watch the garden — or play in it
-pnpm test       # invariants (52)
+pnpm test       # invariants (56)
 pnpm baseline   # headless motion-baseline report
 pnpm analyze    # aggregate hunt reports into the protocol's metrics
+pnpm sweep      # plan the parameter sweep: collection URLs + hunt assembly
 pnpm typecheck
 pnpm build
 ```

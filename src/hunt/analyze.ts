@@ -65,6 +65,8 @@ export interface Analysis {
   perSpecies: Cell[];
   perPressure: Cell[];
   perVariation: Cell[];
+  /** NPC:hider ratio of the hunt each judgement was made in — the third axis. */
+  perRatio: Cell[];
   /** Correctness by stated confidence: are Hunters reading or guessing? */
   perConfidence: Cell[];
   /** Every caught human's preceding behaviour — the publishable output. */
@@ -130,6 +132,12 @@ export function analyze(reports: readonly HuntReport[]): Analysis {
     perVariation: cells(
       all.map(({ report, a }) => ({ key: `npcVariation=${report.npcVariation}`, wasHuman: a.wasHuman }))
     ),
+    perRatio: cells(
+      all.map(({ report, a }) => {
+        const ratio = (report.critterCount - report.humanCount) / report.humanCount;
+        return { key: `NPC:hider ~${ratio.toFixed(1)}:1`, wasHuman: a.wasHuman };
+      })
+    ),
     perConfidence: cells(all.map(({ a }) => ({ key: `confidence ${a.confidence}`, wasHuman: a.wasHuman }))),
     tellInventory: caught.map(({ report, a }) => ({
       hunter: report.hunter,
@@ -173,6 +181,7 @@ export function render(analysis: Analysis): string {
   section("per accused species", analysis.perSpecies);
   section("per objective pressure (caught humans only)", analysis.perPressure);
   section("per npcVariation", analysis.perVariation);
+  section("per NPC:hider ratio", analysis.perRatio);
   section("confidence vs correctness", analysis.perConfidence);
 
   if (analysis.tellInventory.length > 0) {

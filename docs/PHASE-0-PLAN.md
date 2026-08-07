@@ -144,13 +144,23 @@ protocol — two single-player sessions, no netcode, no concurrency.
 > per-hunter rates never pooled, confidence-vs-correctness, mean time to
 > detection, and the tell inventory verbatim. Mixed sim versions are refused.
 
-### 0.7 — Parameter sweep
+### 0.7 — Parameter sweep ✅ *(tooling landed 2026-08-07)*
 
 Three axes: `npcVariation` × **NPC:hider ratio** (5–9 per hider, the game's
 primary balance dial per `DESIGN.md` §3.2) × objective pressure.
 
 The output is a **curve, not a verdict** — "at what parameters does it work",
 not "does it work".
+
+> **As built** (`src/hunt/sweep.ts` + `scripts/sweep.ts`): variation and
+> pressure are set at *recording* time — `pnpm sweep plan` prints the grid as
+> shareable garden URLs (`var=`, `pressure=`, `pop=` are now URL params). The
+> ratio axis is set at *hunt-assembly* time: the same scene's sessions mix
+> into 2-, 3- and 4-ghost hunts (10:1, ~6.7:1, 5:1 at 20 NPCs), which
+> `pnpm sweep hunts <dir>` plans from collected saves, flagging gaps. The
+> analyzer slices detection per variation, pressure, ratio, species, hunter
+> and confidence. **The build is done; the number now needs people** — ≥20
+> hunt sessions and ≥60 judgements per the protocol, read against §6.
 
 ### Gate
 

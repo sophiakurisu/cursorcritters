@@ -3,6 +3,7 @@ import { Renderer } from "./render/render.js";
 import { eventPhase, OBJECTIVES, SCHEDULE } from "./sim/objectives.js";
 import { serialise } from "./sim/replay.js";
 import { TICK_HZ, World } from "./sim/sim.js";
+import { DEFAULT_TUNING } from "./sim/species.js";
 import {
   CHOOSABLE,
   SPECIES,
@@ -84,10 +85,32 @@ function pressureFromUrl(): ObjectivePressure {
   return v === "none" || v === "verb" || v === "place" ? v : "place";
 }
 
+/** `var=0.35` — the primary balance knob, one axis of the 0.7 sweep. */
+function variationFromUrl(): number | undefined {
+  const v = Number(hashParams().get("var"));
+  return Number.isFinite(v) && hashParams().has("var") ? Math.max(0, Math.min(1, v)) : undefined;
+}
+
+/** `pop=8,7,5` — ground,tree,water NPC counts; the ratio axis's other half. */
+function populationFromUrl(): { ground: number; tree: number; water: number } | undefined {
+  const raw = hashParams().get("pop");
+  if (!raw) return undefined;
+  const parts = raw.split(",").map((p) => Number(p));
+  if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 40)) return undefined;
+  return { ground: parts[0]!, tree: parts[1]!, water: parts[2]! };
+}
+
 function makeWorld(seed: string): World {
   const humans: Partial<Record<Species, number>> = {};
   if (playSpecies) humans[playSpecies] = 1;
-  const w = new World({ seed, humans, objectivePressure: pressureFromUrl() });
+  const variation = variationFromUrl();
+  const w = new World({
+    seed,
+    humans,
+    objectivePressure: pressureFromUrl(),
+    ...(variation !== undefined ? { tuning: { npcVariation: variation } } : {}),
+    ...(populationFromUrl() ? { population: populationFromUrl() } : {}),
+  });
   renderer.highlightId = w.critters.find((c) => c.isHuman)?.id ?? null;
   pendingInputs.length = 0;
   return w;
@@ -112,7 +135,8 @@ function me(): ReturnType<World["critters"]["find"]> {
 function refreshHud(): void {
   const c = world.counts();
   tickEl.textContent = `t ${world.tick}`;
-  seedEl.textContent = `seed ${world.seed}`;
+  const variation = world.tuning.npcVariation;
+  seedEl.textContent = `seed ${world.seed}${variation === DEFAULT_TUNING.npcVariation ? "" : ` · var ${variation}`}`;
   countsEl.textContent = `${c.ground} ground · ${c.tree} tree · ${c.water} water`;
   const m = me();
   youEl.hidden = !m;

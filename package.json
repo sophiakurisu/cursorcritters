@@ -9,7 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "baseline": "tsx scripts/baseline.ts",
-    "analyze": "tsx scripts/analyze.ts"
+    "analyze": "tsx scripts/analyze.ts",
+    "sweep": "tsx scripts/sweep.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.8",
