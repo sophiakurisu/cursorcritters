@@ -26,6 +26,14 @@ or proves it doesn't, for the price of a fortnight instead of a year.
 Thresholds were pre-registered before any data and do not move:
 [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) §6.
 
+Step 0.4 made sessions durable: the **save** button downloads a versioned
+replay — `{simVersion, config, inputLog, fingerprint}` — that replays by
+re-running the sim and *refuses to load* if the sim has changed since it was
+recorded, if the file was edited, or if the re-run doesn't land on the recorded
+fingerprint. A pinned drift test fails any behaviour change that forgets to
+bump `SIM_VERSION`. This is the Phase A collection format the hunt (0.5) will
+be assembled from.
+
 Step 0.3 added the **schedule** and the **objectives** that hang from it. The
 garden runs a 45-second rhythm: the bloom (ground critters gather to graze at
 the flower patch), the shoal (water critters dive at the shoal), the harvest
@@ -52,7 +60,7 @@ replays a session exactly (versioned serialisation is step 0.4).
 ```sh
 pnpm install
 pnpm dev        # watch the garden — or play in it
-pnpm test       # invariants (30)
+pnpm test       # invariants (36)
 pnpm baseline   # headless motion-baseline report
 pnpm typecheck
 pnpm build

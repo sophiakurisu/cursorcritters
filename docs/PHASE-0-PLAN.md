@@ -83,7 +83,7 @@ the tell. Phase 0 needs at least two objective types and a schedule tick.
 > 0.6's tell inventory will join against. Baseline travel share is unchanged
 > (~36–43%); verb mixes now pulse with the schedule, by design.
 
-### 0.4 — Versioned record/replay
+### 0.4 — Versioned record/replay ✅ *(landed 2026-08-07)*
 
 Sessions serialise as `{ simVersion, seed, tuning, inputLog }`.
 
@@ -92,6 +92,18 @@ Sessions serialise as `{ simVersion, seed, tuning, inputLog }`.
 - Replay **refuses to load** on version mismatch rather than replaying wrongly.
 
 `World.fingerprint()` already exists and is the mechanism.
+
+> **As built** (`src/sim/replay.ts`): sessions are
+> `{simVersion, configHash, config, ticks, inputLog, fingerprint}` — config is
+> the world's fully-resolved `WorldConfig` (per roadmap Rule 8, the swept
+> parameters are first-class config), configHash catches edited or truncated
+> files, and the recorded final fingerprint must be reproduced exactly on load
+> or the replay is refused as diverged. The drift test pins fixed-seed
+> fingerprints per `SIM_VERSION` (NPC-only and with-humans) and also fails if
+> the version is bumped without re-pinning. The harness's **save** button
+> downloads the current session in this format — the Phase A collection
+> artefact. Checkpoints (roadmap Rule 5) are deferred until sessions outgrow
+> re-simulation from tick zero, which 30–180s gardens have not.
 
 ### 0.5 — Hunt interface
 

@@ -81,12 +81,30 @@ export class World {
   /** Stream for world-level events (startle, spawning), separate from critters. */
   private readonly worldRng: Rng;
 
+  /**
+   * The exact configuration this world was built from, defaults resolved.
+   * Replays serialise it verbatim: `{simVersion, config, inputLog}` must be
+   * everything needed to rebuild this session, so nothing here may be implied.
+   */
+  readonly config: Required<WorldConfig>;
+
   constructor(config: WorldConfig) {
     this.seed = config.seed;
     this.tuning = config.tuning ?? DEFAULT_TUNING;
     this.objectives = new ObjectiveTracker(config.objectivePressure ?? "place");
     this.events = activeEvents(0);
     const population = config.population ?? DEFAULT_POPULATION;
+    this.config = Object.freeze({
+      seed: config.seed,
+      population: { ...population },
+      tuning: { ...this.tuning },
+      humans: {
+        ground: config.humans?.ground ?? 0,
+        tree: config.humans?.tree ?? 0,
+        water: config.humans?.water ?? 0,
+      },
+      objectivePressure: this.objectives.pressure,
+    });
 
     const gardenRng = makeRng(`${config.seed}:garden`);
     this.garden = makeGarden(gardenRng);
