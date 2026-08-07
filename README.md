@@ -26,6 +26,17 @@ or proves it doesn't, for the price of a fortnight instead of a year.
 Thresholds were pre-registered before any data and do not move:
 [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) §6.
 
+Step 0.3 added the **schedule** and the **objectives** that hang from it. The
+garden runs a 45-second rhythm: the bloom (ground critters gather to graze at
+the flower patch), the shoal (water critters dive at the shoal), the harvest
+(tree critters pick the fruiting tree) — each announced by a four-second cue,
+staggered so something is always about to happen somewhere. When you play, your
+secret objective opens *inside* your species' window: do it on time, at the
+focus, and you are one of the crowd; miss it and the record shows a failed
+window; do it off-schedule and you are the one critter still trading after the
+bell — the tell the entire design rests on. Objective pressure
+(`#pressure=none|verb|place`) is one axis of the eventual parameter sweep.
+
 Step 0.2 is done too: a **playable critter**. Pick a species from the `play`
 selector (or `#play=ground|tree|water` in the URL) and you control one critter —
 restricted to its species' verb set, issued through the exact state machine the
@@ -41,7 +52,7 @@ replays a session exactly (versioned serialisation is step 0.4).
 ```sh
 pnpm install
 pnpm dev        # watch the garden — or play in it
-pnpm test       # invariants (22)
+pnpm test       # invariants (30)
 pnpm baseline   # headless motion-baseline report
 pnpm typecheck
 pnpm build
@@ -118,7 +129,9 @@ moved nothing, and critters that could stand still for 25 seconds because a hop
 clamped against the world boundary still counted as a journey.
 
 Current profile: all three species ~36–43% travelling, each with a distinct verb
-mix (ground grazes, tree perches, water drifts).
+mix (ground grazes, tree perches, water drifts). Since 0.3 the mixes pulse with
+the schedule — pickFruit and dive spike while a window is open — but the travel
+share the balance rests on is unchanged.
 
 ---
 

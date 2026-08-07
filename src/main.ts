@@ -1,7 +1,15 @@
 import "./style.css";
 import { Renderer } from "./render/render.js";
+import { eventPhase, OBJECTIVES, SCHEDULE } from "./sim/objectives.js";
 import { TICK_HZ, World } from "./sim/sim.js";
-import { CHOOSABLE, SPECIES, type PlayerInput, type Species, type Verb } from "./sim/types.js";
+import {
+  CHOOSABLE,
+  SPECIES,
+  type ObjectivePressure,
+  type PlayerInput,
+  type Species,
+  type Verb,
+} from "./sim/types.js";
 
 /**
  * Dev harness, two modes:
@@ -23,6 +31,7 @@ const tickEl = document.querySelector<HTMLElement>("#tick")!;
 const seedEl = document.querySelector<HTMLElement>("#seed")!;
 const countsEl = document.querySelector<HTMLElement>("#counts")!;
 const youEl = document.querySelector<HTMLElement>("#you")!;
+const goalEl = document.querySelector<HTMLElement>("#goal")!;
 const pauseBtn = document.querySelector<HTMLButtonElement>("#pause")!;
 const speedBtn = document.querySelector<HTMLButtonElement>("#speed")!;
 const reseedBtn = document.querySelector<HTMLButtonElement>("#reseed")!;
@@ -68,10 +77,15 @@ function playFromUrl(): Species | null {
   return (SPECIES as readonly string[]).includes(v) ? (v as Species) : null;
 }
 
+function pressureFromUrl(): ObjectivePressure {
+  const v = hashParams().get("pressure") ?? "";
+  return v === "none" || v === "verb" || v === "place" ? v : "place";
+}
+
 function makeWorld(seed: string): World {
   const humans: Partial<Record<Species, number>> = {};
   if (playSpecies) humans[playSpecies] = 1;
-  const w = new World({ seed, humans });
+  const w = new World({ seed, humans, objectivePressure: pressureFromUrl() });
   renderer.highlightId = w.critters.find((c) => c.isHuman)?.id ?? null;
   pendingInputs.length = 0;
   return w;
@@ -101,6 +115,38 @@ function refreshHud(): void {
   const m = me();
   youEl.hidden = !m;
   if (m) youEl.textContent = `you: ${m.verb}${m.pendingIntent ? ` → ${m.pendingIntent.verb}` : ""}`;
+  refreshGoal();
+}
+
+const PLACE_HINT: Record<string, string> = {
+  bloom: "at the patch",
+  shoal: "at the shoal",
+  harvest: "at the fruit tree",
+};
+
+/** The player's secret objective, phrased against the schedule clock. */
+function refreshGoal(): void {
+  const m = me();
+  const objective = m && OBJECTIVES.find((o) => o.species === m.species);
+  const def = objective && SCHEDULE.find((s) => s.id === objective.eventId);
+  const pressure = world.objectives.pressure;
+  if (!m || !objective || !def || pressure === "none") {
+    goalEl.hidden = true;
+    return;
+  }
+  goalEl.hidden = false;
+  const ev = eventPhase(def, world.tick);
+  const where = pressure === "place" ? ` ${PLACE_HINT[def.id]}` : "";
+  const goal = `${objective.verb} ×${objective.count}${where}`;
+  const s = Math.ceil(ev.ticksLeft / TICK_HZ);
+  if (ev.phase === "open") {
+    const got = world.objectives.progressOf(m.id);
+    goalEl.textContent = got >= objective.count ? `${def.id} ✓ done` : `${def.id} OPEN ${s}s · ${goal} · ${got}/${objective.count}`;
+  } else if (ev.phase === "warn") {
+    goalEl.textContent = `${def.id} in ${s}s — ${goal}`;
+  } else {
+    goalEl.textContent = `next ${def.id} in ${s + def.warn / TICK_HZ}s · ${goal}`;
+  }
 }
 
 function frame(now: number): void {

@@ -62,7 +62,7 @@ human chooses *which verb, when* and *where* — nothing else. An invariant test
 should assert that a recorded human session contains no verb or motion outside
 its species grammar.
 
-### 0.3 — Schedule-aligned objectives
+### 0.3 — Schedule-aligned objectives ✅ *(landed 2026-08-07)*
 
 Objectives force purposeful movement — the tell the whole design rests on
 (NPCs move aimlessly, humans move with intent).
@@ -70,6 +70,18 @@ Objectives force purposeful movement — the tell the whole design rests on
 Per `DESIGN.md` §3.1, objective windows open **inside** the matching NPC
 schedule event, so doing the objective on time *is* blending and doing it late is
 the tell. Phase 0 needs at least two objective types and a schedule tick.
+
+> **As built:** three recurring events on one 45s cycle, staggered a third
+> apart — bloom (ground, flower patch), shoal (water, shoal spot), harvest
+> (tree, fruiting tree) — each quiet 31s → warn 4s → open 10s, a pure function
+> of the tick (`src/sim/objectives.ts`), nothing serialised. The warn phase is
+> the assembly call: NPCs start travelling to the focus when it sounds, then
+> lean into the event verb while the window is open. One objective per species
+> (event verb ×2 inside the window), with `objectivePressure` none | verb |
+> place as the sweep axis — `place` requires the verb near the focus.
+> Completions and missed windows land in `World.objectives.outcomes`, the feed
+> 0.6's tell inventory will join against. Baseline travel share is unchanged
+> (~36–43%); verb mixes now pulse with the schedule, by design.
 
 ### 0.4 — Versioned record/replay
 

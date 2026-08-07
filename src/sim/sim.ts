@@ -1,5 +1,6 @@
 import { deriveRng, makeRng, type Rng } from "./rng.js";
 import { makeGarden } from "./garden.js";
+import { activeEvents, ObjectiveTracker, type ActiveEvents } from "./objectives.js";
 import { DEFAULT_TUNING, spawn, startle, stepCritter, TICK_HZ, type Tuning } from "./species.js";
 import {
   CHOOSABLE,
@@ -7,6 +8,7 @@ import {
   type Garden,
   type HumanIntent,
   type InputRecord,
+  type ObjectivePressure,
   type PlayerInput,
   type Species,
 } from "./types.js";
@@ -32,6 +34,13 @@ export interface WorldConfig {
    * which is what makes A/B comparison and the hunt itself meaningful.
    */
   humans?: Partial<Population>;
+  /**
+   * How demanding the human's schedule-aligned objective is — one axis of the
+   * 0.7 parameter sweep. Defaults to "place": the verb, at the focus, during
+   * the window. NPC schedule behaviour runs regardless; this only gates what
+   * is asked of the human.
+   */
+  objectivePressure?: ObjectivePressure;
 }
 
 /**
@@ -58,6 +67,15 @@ export class World {
    */
   readonly inputLog: InputRecord[] = [];
 
+  /**
+   * Objective windows hit and missed by the human critters — the raw feed for
+   * 0.6's instrumentation, and deterministic alongside everything else.
+   */
+  readonly objectives: ObjectiveTracker;
+
+  /** The schedule at the current tick, recomputed each step (pure). */
+  events: ActiveEvents = {};
+
   /** One independent stream per critter, so populations stay comparable. */
   private readonly streams: Rng[] = [];
   /** Stream for world-level events (startle, spawning), separate from critters. */
@@ -66,6 +84,8 @@ export class World {
   constructor(config: WorldConfig) {
     this.seed = config.seed;
     this.tuning = config.tuning ?? DEFAULT_TUNING;
+    this.objectives = new ObjectiveTracker(config.objectivePressure ?? "place");
+    this.events = activeEvents(0);
     const population = config.population ?? DEFAULT_POPULATION;
 
     const gardenRng = makeRng(`${config.seed}:garden`);
@@ -102,10 +122,12 @@ export class World {
   step(inputs?: readonly PlayerInput[]): void {
     this.tick++;
     if (inputs) for (const input of inputs) this.apply(input);
+    this.events = activeEvents(this.tick);
     for (const c of this.critters) {
       const rng = this.streams[c.rngIndex];
-      if (rng) stepCritter(c, this.garden, rng, this.tuning);
+      if (rng) stepCritter(c, this.garden, rng, this.tuning, this.events);
     }
+    this.objectives.tick(this.tick, this.garden, this.critters);
   }
 
   /**

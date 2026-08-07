@@ -1,17 +1,30 @@
 import type { Rng } from "./rng.js";
 import {
   dist,
+  inPond,
   keepOutOfPond,
+  nearbyTreeCandidates,
   nearbyTreeIndex,
   randomGrassPoint,
   randomPondPoint,
   randomTreeIndex,
+  segmentEntersPond,
   treeBase,
 } from "./garden.js";
 import { legalGroundTarget, legalPondTarget, legalTreeIndex } from "./human.js";
-import type { Critter, Garden, HumanIntent, Species, Verb } from "./types.js";
+import type { ActiveEvents } from "./objectives.js";
+import {
+  TICK_HZ,
+  type Critter,
+  type Garden,
+  type HumanIntent,
+  type SchedulePhase,
+  type Species,
+  type Verb,
+  type Vec,
+} from "./types.js";
 
-export const TICK_HZ = 30;
+export { TICK_HZ };
 
 /**
  * Knobs the experiment sweeps. See
@@ -128,6 +141,73 @@ const enterDrift = (c: Critter, rng: Rng, t: Tuning): void =>
 const enterDive = (c: Critter, rng: Rng, t: Tuning): void =>
   enter(c, "dive", hold(rng, secs(1.8), secs(1.0), t));
 
+// ===========================================================================
+// Schedule-event crowd behaviour (DESIGN §3.1). While a species' window is
+// open, its NPCs lean toward the event verb and drift toward the focus
+// feature. Only NPCs: the human hears the same bell but must *choose* to
+// answer it — that choice is the objective, and fumbling it is the tell.
+// ===========================================================================
+
+/** Longest single gather leg — under the MAX_JOURNEY travel cap (8s × 60px/s),
+ * so one leg from anywhere in the garden reaches the focus, and the farthest
+ * critters arrive as the window opens rather than as it closes. */
+const GATHER_REACH = 420;
+
+/** A walkable point near the event focus, pond-checked from the critter's own
+ * position; falls back to an ordinary wander when every sample is blocked. */
+function gatherPoint(g: Garden, rng: Rng, from: Vec, anchor: Vec, radius: number): Vec {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const a = rng.range(0, Math.PI * 2);
+    const r = Math.sqrt(rng.next()) * radius;
+    let p: Vec = {
+      x: Math.max(40, Math.min(g.width - 40, anchor.x + Math.cos(a) * r)),
+      y: Math.max(40, Math.min(g.height - 40, anchor.y + Math.sin(a) * r)),
+    };
+    const d = dist(from, p);
+    if (d > GATHER_REACH) {
+      p = {
+        x: from.x + ((p.x - from.x) / d) * GATHER_REACH,
+        y: from.y + ((p.y - from.y) / d) * GATHER_REACH,
+      };
+    }
+    if (inPond(g.pond, p)) continue;
+    if (segmentEntersPond(g.pond, from, p, 6)) continue;
+    return p;
+  }
+  return randomGrassPoint(g, rng, from, HOP.ground);
+}
+
+/** A point in the shoal, kept inside the rim water critters swim within. */
+function shoalPoint(g: Garden, rng: Rng): Vec {
+  const a = rng.range(0, Math.PI * 2);
+  const r = Math.sqrt(rng.next()) * 40;
+  const p: Vec = { x: g.shoalSpot.x + Math.cos(a) * r, y: g.shoalSpot.y + Math.sin(a) * r };
+  const nx = (p.x - g.pond.pos.x) / (g.pond.rx * 0.82);
+  const ny = (p.y - g.pond.pos.y) / (g.pond.ry * 0.82);
+  const d = Math.hypot(nx, ny);
+  if (d > 1) {
+    p.x = g.pond.pos.x + (nx / d) * g.pond.rx * 0.82;
+    p.y = g.pond.pos.y + (ny / d) * g.pond.ry * 0.82;
+  }
+  return p;
+}
+
+/** During the harvest (from the warning on), prefer the fruiting tree whenever
+ * it is a legal hop — the same nearest-neighbour constraint as ever, so the
+ * crowd converges over several hops rather than beelining across the garden. */
+function pickTreeTarget(g: Garden, rng: Rng, from: Vec, exclude: number, evp: SchedulePhase): number {
+  if (
+    evp !== "quiet" &&
+    g.fruitTreeIndex >= 0 &&
+    g.fruitTreeIndex !== exclude &&
+    nearbyTreeCandidates(g, from, exclude).includes(g.fruitTreeIndex) &&
+    rng.chance(0.85)
+  ) {
+    return g.fruitTreeIndex;
+  }
+  return nearbyTreeIndex(g, rng, from, exclude);
+}
+
 /**
  * Bends the base verb weights toward this critter's temperament.
  *
@@ -146,36 +226,45 @@ function biased(c: Critter, verbs: readonly Verb[], base: readonly number[], t: 
 // Ground: walk the grass and graze. The default idle rhythm of the garden.
 // ===========================================================================
 
-function stepGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+function stepGround(c: Critter, g: Garden, rng: Rng, t: Tuning, evp: SchedulePhase): void {
   switch (c.verb) {
     case "walk": {
       const arrived = c.target ? moveToward(c, c.target, SPEED.walk) : true;
       keepOutOfPond(c.pos, g.pond);
-      if (arrived || --c.timer <= 0) chooseGround(c, g, rng, t);
+      if (arrived || --c.timer <= 0) chooseGround(c, g, rng, t, evp);
       return;
     }
     case "flee": {
       // Panic ignores the water, so the bank clamp does the work here.
-      if (c.target && moveToward(c, c.target, SPEED.flee)) chooseGround(c, g, rng, t);
-      else if (--c.timer <= 0) chooseGround(c, g, rng, t);
+      if (c.target && moveToward(c, c.target, SPEED.flee)) chooseGround(c, g, rng, t, evp);
+      else if (--c.timer <= 0) chooseGround(c, g, rng, t, evp);
       keepOutOfPond(c.pos, g.pond);
       return;
     }
     default: {
       // idle / graze — stationary
-      if (--c.timer <= 0) chooseGround(c, g, rng, t);
+      if (--c.timer <= 0) chooseGround(c, g, rng, t, evp);
     }
   }
 }
 
-function chooseGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+function chooseGround(c: Critter, g: Garden, rng: Rng, t: Tuning, evp: SchedulePhase): void {
   if (c.isHuman) return humanChooseGround(c, g, rng, t);
-  // Aimless by construction: the target is a random point, never a goal. A human
-  // pursuing an objective moves purposefully, and that is the whole tell.
+  // Aimless by construction outside events: the target is a random point, never
+  // a goal. When the bloom warning sounds the crowd walks to the patch; while
+  // the window is open it grazes there — which is exactly the cover a human's
+  // own purposeful trip to the patch hides inside.
   const options = ["walk", "graze", "idle"] as const;
-  const verb = restless(c) ? "walk" : rng.weighted<Verb>(options, biased(c, options, [0.34, 0.44, 0.22], t));
-  if (verb === "walk") enter(c, "walk", MAX_JOURNEY, randomGrassPoint(g, rng, c.pos, HOP.ground));
-  else if (verb === "graze") enterGraze(c, rng, t);
+  const weights: readonly number[] =
+    evp === "warn" ? [0.75, 0.2, 0.05] : evp === "open" ? [0.3, 0.65, 0.05] : [0.34, 0.44, 0.22];
+  const verb = restless(c) ? "walk" : rng.weighted<Verb>(options, biased(c, options, weights, t));
+  if (verb === "walk") {
+    const target =
+      evp !== "quiet" && rng.chance(0.8)
+        ? gatherPoint(g, rng, c.pos, g.flowerPatch, 55)
+        : randomGrassPoint(g, rng, c.pos, HOP.ground);
+    enter(c, "walk", MAX_JOURNEY, target);
+  } else if (verb === "graze") enterGraze(c, rng, t);
   else enterIdle(c, rng, t);
 }
 
@@ -204,7 +293,7 @@ function humanChooseGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
 // Tree: cross the grass, climb, perch, pick fruit, drop. Vertical rhythm.
 // ===========================================================================
 
-function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning, evp: SchedulePhase): void {
   switch (c.verb) {
     case "walk": {
       const arrived = c.target ? moveToward(c, c.target, SPEED.walk) : true;
@@ -212,7 +301,7 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
       if (arrived) enter(c, "climb", secs(2));
       else if (--c.timer <= 0) {
         // Blocked route — retarget rather than grind against the bank.
-        const next = nearbyTreeIndex(g, rng, c.pos, c.treeIndex);
+        const next = pickTreeTarget(g, rng, c.pos, c.treeIndex, evp);
         c.treeIndex = next;
         enter(c, "walk", MAX_JOURNEY, treeBase(g, next, rng));
       }
@@ -222,7 +311,10 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
       c.elevation = Math.min(1, c.elevation + SPEED.climb);
       const tree = g.trees[c.treeIndex];
       if (tree) moveToward(c, tree.pos, SPEED.walk * 0.4);
-      if (c.elevation >= 1) enter(c, "perch", hold(rng, secs(3.4), secs(2.0), t));
+      // A harvest looks busy: short pauses between picks while the window is
+      // open, unhurried perching the rest of the day.
+      if (c.elevation >= 1)
+        enter(c, "perch", evp === "open" ? hold(rng, secs(1.3), secs(0.7), t) : hold(rng, secs(3.4), secs(2.0), t));
       return;
     }
     case "perch": {
@@ -231,8 +323,16 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
         // No perch→perch: chaining it left critters frozen for 25s at a stretch.
         // The restless clock then bounds the perch↔pickFruit cycle, which could
         // otherwise keep a critter in one tree indefinitely.
+        //
+        // Warn = descend and travel toward the fruiting tree; open = harvest.
         const options = ["pickFruit", "drop"] as const;
-        const verb = restless(c) ? "drop" : rng.weighted<Verb>(options, biased(c, options, [0.58, 0.42], t));
+        const weights: readonly number[] =
+          evp === "warn" && c.treeIndex !== g.fruitTreeIndex
+            ? [0.2, 0.8]
+            : evp === "open"
+              ? [0.85, 0.15]
+              : [0.58, 0.42];
+        const verb = restless(c) ? "drop" : rng.weighted<Verb>(options, biased(c, options, weights, t));
         if (verb === "pickFruit") enterPickFruit(c, rng, t);
         else enter(c, "drop", secs(1));
       }
@@ -246,14 +346,15 @@ function stepTree(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
         c.pos.x = tree.pos.x + Math.cos(c.heading) * tree.radius * 0.42;
         c.pos.y = tree.pos.y + Math.sin(c.heading) * tree.radius * 0.42;
       }
-      if (--c.timer <= 0) enter(c, "perch", hold(rng, secs(2.6), secs(1.6), t));
+      if (--c.timer <= 0)
+        enter(c, "perch", evp === "open" ? hold(rng, secs(1.3), secs(0.7), t) : hold(rng, secs(2.6), secs(1.6), t));
       return;
     }
     case "drop": {
       c.elevation = Math.max(0, c.elevation - SPEED.drop);
       if (c.elevation <= 0) {
         if (c.isHuman) return humanChooseTreeGround(c, g, rng, t);
-        const next = nearbyTreeIndex(g, rng, c.pos, c.treeIndex);
+        const next = pickTreeTarget(g, rng, c.pos, c.treeIndex, evp);
         c.treeIndex = next;
         enter(c, "walk", MAX_JOURNEY, next >= 0 ? treeBase(g, next, rng) : randomGrassPoint(g, rng, c.pos));
       }
@@ -310,11 +411,11 @@ function humanChooseTreeGround(c: Critter, g: Garden, rng: Rng, t: Tuning): void
 // Water: swim, drift, and vanish under the surface. The pond's own rhythm.
 // ===========================================================================
 
-function stepWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+function stepWater(c: Critter, g: Garden, rng: Rng, t: Tuning, evp: SchedulePhase): void {
   switch (c.verb) {
     case "swim": {
       const arrived = c.target ? moveToward(c, c.target, SPEED.swim) : true;
-      if (arrived || --c.timer <= 0) chooseWater(c, g, rng, t);
+      if (arrived || --c.timer <= 0) chooseWater(c, g, rng, t, evp);
       return;
     }
     case "drift": {
@@ -323,7 +424,7 @@ function stepWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
       c.pos.x += Math.cos(c.heading) * SPEED.drift;
       c.pos.y += Math.sin(c.heading) * SPEED.drift;
       clampToPond(c, g);
-      if (--c.timer <= 0) chooseWater(c, g, rng, t);
+      if (--c.timer <= 0) chooseWater(c, g, rng, t, evp);
       return;
     }
     case "dive": {
@@ -333,11 +434,11 @@ function stepWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
     }
     case "surface": {
       c.elevation = Math.max(0, c.elevation - SPEED.dive);
-      if (c.elevation <= 0) chooseWater(c, g, rng, t);
+      if (c.elevation <= 0) chooseWater(c, g, rng, t, evp);
       return;
     }
     default:
-      chooseWater(c, g, rng, t);
+      chooseWater(c, g, rng, t, evp);
   }
 }
 
@@ -353,12 +454,16 @@ function clampToPond(c: Critter, g: Garden): void {
   }
 }
 
-function chooseWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+function chooseWater(c: Critter, g: Garden, rng: Rng, t: Tuning, evp: SchedulePhase): void {
   if (c.isHuman) return humanChooseWater(c, g, rng, t);
   const options = ["swim", "drift", "dive"] as const;
-  const verb = restless(c) ? "swim" : rng.weighted<Verb>(options, biased(c, options, [0.44, 0.34, 0.22], t));
-  if (verb === "swim") enter(c, "swim", MAX_JOURNEY, randomPondPoint(g, rng));
-  else if (verb === "drift") enterDrift(c, rng, t);
+  const weights: readonly number[] =
+    evp === "warn" ? [0.8, 0.15, 0.05] : evp === "open" ? [0.3, 0.1, 0.6] : [0.44, 0.34, 0.22];
+  const verb = restless(c) ? "swim" : rng.weighted<Verb>(options, biased(c, options, weights, t));
+  if (verb === "swim") {
+    const target = evp !== "quiet" && rng.chance(0.8) ? shoalPoint(g, rng) : randomPondPoint(g, rng);
+    enter(c, "swim", MAX_JOURNEY, target);
+  } else if (verb === "drift") enterDrift(c, rng, t);
   else enterDive(c, rng, t);
 }
 
@@ -380,11 +485,13 @@ function humanChooseWater(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
 
 // ===========================================================================
 
-export function stepCritter(c: Critter, g: Garden, rng: Rng, t: Tuning): void {
+export function stepCritter(c: Critter, g: Garden, rng: Rng, t: Tuning, ev?: ActiveEvents): void {
   c.sinceTravel++;
-  if (c.species === "ground") stepGround(c, g, rng, t);
-  else if (c.species === "tree") stepTree(c, g, rng, t);
-  else stepWater(c, g, rng, t);
+  // Only NPCs answer the schedule; the human answers it by playing well.
+  const evp: SchedulePhase = (!c.isHuman && ev?.[c.species]?.phase) || "quiet";
+  if (c.species === "ground") stepGround(c, g, rng, t, evp);
+  else if (c.species === "tree") stepTree(c, g, rng, t, evp);
+  else stepWater(c, g, rng, t, evp);
 }
 
 /** Startup state for a fresh critter, placed in its species' home terrain.

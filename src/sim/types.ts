@@ -1,5 +1,8 @@
 export type Species = "ground" | "tree" | "water";
 
+/** Fixed sim rate. Lives here so every sim module can share it without cycles. */
+export const TICK_HZ = 30;
+
 export const SPECIES: readonly Species[] = ["ground", "tree", "water"] as const;
 
 export interface Vec {
@@ -105,6 +108,74 @@ export interface Garden {
   height: number;
   trees: Tree[];
   pond: Pond;
+  /**
+   * Schedule-event focus features (DESIGN §3.1). Each species' recurring event
+   * gathers its crowd here, and place-pressure objectives demand the human's
+   * verb happen nearby — so the trip a Hunter might notice is a trip half the
+   * crowd is also making.
+   */
+  flowerPatch: Vec;
+  /** Index into `trees` of the fruiting tree the harvest event centres on. */
+  fruitTreeIndex: number;
+  shoalSpot: Vec;
+}
+
+/**
+ * A recurring species-wide schedule event — the garden's version of the conch /
+ * bells / volcano pulse. Pure function of the tick: phase(def, tick) needs no
+ * stored state, so replays get schedules for free.
+ */
+export interface ScheduleEventDef {
+  id: string;
+  species: Species;
+  /** The verb the crowd (and any objective) centres on while the window is open. */
+  verb: Verb;
+  /** Ticks from one opening to the next. */
+  period: number;
+  /** Diegetic warning ticks before the window opens — the bell before the feast. */
+  warn: number;
+  /** Ticks the window stays open. */
+  duration: number;
+  /** Phase offset so the three species pulse in turn instead of at once. */
+  offset: number;
+}
+
+export type SchedulePhase = "quiet" | "warn" | "open";
+
+/**
+ * How demanding the human's objective is — the "objective pressure" axis of the
+ * Phase 0 sweep (PROTOCOL §4). `none`: no objective. `verb`: perform the event
+ * verb during the window, anywhere. `place`: perform it near the event's focus
+ * feature, which forces the purposeful travel the whole experiment watches for.
+ */
+export type ObjectivePressure = "none" | "verb" | "place";
+
+export interface ObjectiveDef {
+  id: string;
+  species: Species;
+  /** Window = the open phase of this schedule event. */
+  eventId: string;
+  verb: Verb;
+  /** Verb entries required inside one window to complete it. */
+  count: number;
+  /** For `place` pressure: the verb must start within this radius of the focus. */
+  radius: number;
+}
+
+/**
+ * One completed-or-missed objective window for one human critter. The record
+ * 0.6's instrumentation reads: hit rate is objective pressure actually applied,
+ * and a missed window is exactly the "doing it late is the tell" moment.
+ */
+export interface ObjectiveOutcome {
+  critterId: number;
+  objectiveId: string;
+  /** Which occurrence of the event this was (floor of tick over period). */
+  windowIndex: number;
+  progress: number;
+  done: boolean;
+  /** Tick the window closed (or completed). */
+  tick: number;
 }
 
 export interface Critter {

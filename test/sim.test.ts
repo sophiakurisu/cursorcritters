@@ -133,12 +133,19 @@ describe("liveness", () => {
   });
 
   it("every critter actually moves over a minute", () => {
+    // Peak displacement, not net: schedule gathering legitimately carries a
+    // critter out and back to the same perch, which nets to zero. What liveness
+    // forbids is a critter that never went anywhere at all.
     const w = new World({ seed: "movement" });
     const start = w.critters.map((c) => ({ ...c.pos }));
-    for (let i = 0; i < 30 * 60; i++) w.step();
-    w.critters.forEach((c, i) => {
-      const from = start[i]!;
-      expect(Math.hypot(c.pos.x - from.x, c.pos.y - from.y)).toBeGreaterThan(5);
-    });
+    const peak = w.critters.map(() => 0);
+    for (let i = 0; i < 30 * 60; i++) {
+      w.step();
+      w.critters.forEach((c, idx) => {
+        const from = start[idx]!;
+        peak[idx] = Math.max(peak[idx]!, Math.hypot(c.pos.x - from.x, c.pos.y - from.y));
+      });
+    }
+    for (const p of peak) expect(p).toBeGreaterThan(5);
   });
 });

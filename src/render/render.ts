@@ -1,5 +1,6 @@
-import type { Critter, Garden, Species } from "../sim/types.js";
+import type { Critter, Garden, Species, Vec } from "../sim/types.js";
 import type { World } from "../sim/sim.js";
+import { eventFocus, type EventPhase } from "../sim/objectives.js";
 
 const PALETTE = {
   grassA: "#7fa653",
@@ -63,6 +64,7 @@ export class Renderer {
     ctx.scale(scale, scale);
     this.drawGround(garden);
     this.drawPond(garden);
+    this.drawFoci(world);
 
     // Painter's order: anything not up a tree, then trees, then anything in them,
     // so a perched critter reads as being *in* the canopy rather than behind it.
@@ -78,6 +80,73 @@ export class Renderer {
       if (me) this.drawHighlight(me);
     }
 
+    ctx.restore();
+  }
+
+  /**
+   * The schedule's focus features, always faintly present so the garden's
+   * geography is learnable, with a pulse during the warning and a steady ring
+   * while the window is open — the 2D stand-in for conch, bells and volcano.
+   */
+  private drawFoci(world: World): void {
+    const { ctx } = this;
+    const g = world.garden;
+
+    // Flower patch: a small scatter of blossoms.
+    ctx.save();
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + 0.7;
+      const r = 6 + jitter(i, 11) * 22;
+      const x = g.flowerPatch.x + Math.cos(a) * r;
+      const y = g.flowerPatch.y + Math.sin(a) * r;
+      ctx.fillStyle = i % 2 ? "#e5b8d0" : "#f0e6b0";
+      ctx.beginPath();
+      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath();
+      ctx.arc(x, y, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Fruiting tree: fruit dots on its canopy (drawn again above the canopy in
+    // drawTrees order — these sit under it, so repeat there would be better,
+    // but the canopy is translucent enough that a halo reads; keep the halo.)
+    // Shoal: faint ellipse of ripples.
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(g.shoalSpot.x, g.shoalSpot.y, 16, 9, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    for (const ev of Object.values(world.events)) {
+      if (!ev || ev.phase === "quiet") continue;
+      this.drawEventRing(world, ev);
+    }
+  }
+
+  private drawEventRing(world: World, ev: EventPhase): void {
+    const { ctx } = this;
+    const focus: Vec = eventFocus(world.garden, ev.def);
+    const open = ev.phase === "open";
+    // Warn pulses on the sim tick (deterministic across replays); open is steady.
+    const pulse = open ? 1 : 0.55 + 0.45 * Math.sin(world.tick * 0.35);
+    const radius =
+      ev.def.id === "harvest"
+        ? (world.garden.trees[world.garden.fruitTreeIndex]?.radius ?? 30) + 10
+        : ev.def.id === "bloom"
+          ? 44
+          : 34;
+    ctx.save();
+    ctx.strokeStyle = open ? "rgba(255, 244, 190, 0.85)" : "rgba(255, 244, 190, 0.5)";
+    ctx.lineWidth = open ? 2.4 : 1.6;
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.arc(focus.x, focus.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 

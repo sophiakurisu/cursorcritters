@@ -41,7 +41,30 @@ export function makeGarden(rng: Rng): Garden {
     trees.push({ pos, radius: rng.range(30, 42) });
   }
 
-  return { width, height, trees, pond };
+  // Schedule-event foci, drawn after everything above so gardens keep the exact
+  // layout they had before schedules existed (append-only RNG consumption).
+  let flowerPatch: Vec = { x: width * 0.3, y: height * 0.3 };
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const p: Vec = { x: rng.range(90, width - 90), y: rng.range(90, height - 90) };
+    if (inPond(pond, p)) continue;
+    const dx = (p.x - pond.pos.x) / (pond.rx + 60);
+    const dy = (p.y - pond.pos.y) / (pond.ry + 60);
+    if (dx * dx + dy * dy <= 1) continue;
+    // Off the canopies, so grazing at the patch reads on screen.
+    if (trees.some((t) => dist(t.pos, p) < t.radius + 34)) continue;
+    flowerPatch = p;
+    break;
+  }
+
+  const fruitTreeIndex = trees.length > 0 ? rng.int(trees.length) : -1;
+
+  const shoalAngle = rng.range(0, Math.PI * 2);
+  const shoalSpot: Vec = {
+    x: pond.pos.x + Math.cos(shoalAngle) * pond.rx * 0.45,
+    y: pond.pos.y + Math.sin(shoalAngle) * pond.ry * 0.45,
+  };
+
+  return { width, height, trees, pond, flowerPatch, fruitTreeIndex, shoalSpot };
 }
 
 export function dist(a: Vec, b: Vec): number {
