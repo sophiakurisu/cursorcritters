@@ -26,6 +26,15 @@ or proves it doesn't, for the price of a fortnight instead of a year.
 Thresholds were pre-registered before any data and do not move:
 [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) §6.
 
+Step 0.5 is **the hunt** (`hunt.html`, linked from the garden page): load one
+or more saved sessions from the same seed, and watch them play back as ghosts
+among fresh NPCs — trajectory-exact, visually indistinguishable, ids in
+sequence. Click a critter to accuse (the sim pauses; accusation is a considered
+act), rate your confidence 1–5, and learn nothing until the reveal, which
+reports catches against the chance baseline and attaches each accused critter's
+last 15 seconds of behaviour — the beginnings of the tell inventory. The hunt
+report downloads as JSON for 0.6's instrumentation.
+
 Step 0.4 made sessions durable: the **save** button downloads a versioned
 replay — `{simVersion, config, inputLog, fingerprint}` — that replays by
 re-running the sim and *refuses to load* if the sim has changed since it was
@@ -60,7 +69,7 @@ replays a session exactly (versioned serialisation is step 0.4).
 ```sh
 pnpm install
 pnpm dev        # watch the garden — or play in it
-pnpm test       # invariants (36)
+pnpm test       # invariants (45)
 pnpm baseline   # headless motion-baseline report
 pnpm typecheck
 pnpm build

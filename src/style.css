@@ -70,6 +70,17 @@ canvas {
   white-space: nowrap;
 }
 
+a.pill {
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+a.pill:hover {
+  background: rgba(127, 166, 83, 0.18);
+}
+
 .spacer {
   width: 6px;
 }
@@ -116,4 +127,58 @@ button:active {
   border-radius: 999px;
   padding: 2px 6px;
   cursor: pointer;
+}
+
+/* Hunt-page panels */
+
+.panel {
+  max-width: 520px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 22px;
+  backdrop-filter: blur(8px);
+  line-height: 1.5;
+}
+
+.panel h1 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+
+.panel code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.panel .row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.panel ul {
+  padding-left: 18px;
+  font-size: 12px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.floating {
+  position: fixed;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.error {
+  color: #d65846;
+  font-size: 12px;
+}
+
+input[type="file"] {
+  font-size: 12px;
+  margin: 8px 0;
 }

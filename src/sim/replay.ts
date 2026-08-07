@@ -14,7 +14,7 @@
  * reported alongside the version that produced them.
  */
 import { hashSeed } from "./rng.js";
-import { World, type WorldConfig } from "./sim.js";
+import { World, type ResolvedWorldConfig } from "./sim.js";
 import type { InputRecord, PlayerInput } from "./types.js";
 
 /**
@@ -32,10 +32,12 @@ export interface Replay {
   simVersion: number;
   /** Hash of `config`, so a hand-edited or truncated file fails loudly. */
   configHash: string;
-  config: Required<WorldConfig>;
+  config: ResolvedWorldConfig;
   /** How many steps the recorded session ran. */
   ticks: number;
   inputLog: InputRecord[];
+  /** Startles (dev-harness disturbances), applied after their logged tick. */
+  startleLog?: { tick: number; x: number; y: number }[];
   /** Final-state fingerprint — replaying must land exactly here. */
   fingerprint: string;
 }
@@ -43,7 +45,7 @@ export interface Replay {
 export class ReplayError extends Error {}
 
 /** JSON with sorted keys, so hashing is stable across serialisers. */
-function stableStringify(value: unknown): string {
+export function stableStringify(value: unknown): string {
   return JSON.stringify(value, (_key, v: unknown) => {
     if (v && typeof v === "object" && !Array.isArray(v)) {
       const record = v as Record<string, unknown>;
@@ -58,7 +60,7 @@ function stableStringify(value: unknown): string {
   });
 }
 
-export function hashConfig(config: Required<WorldConfig>): string {
+export function hashConfig(config: ResolvedWorldConfig): string {
   return hashSeed(stableStringify(config)).toString(16).padStart(8, "0");
 }
 
@@ -70,6 +72,7 @@ export function serialise(world: World): Replay {
     config: world.config,
     ticks: world.tick,
     inputLog: [...world.inputLog],
+    startleLog: [...world.startleLog],
     fingerprint: world.fingerprint(),
   };
 }
@@ -84,7 +87,7 @@ export function serialise(world: World): Replay {
  *  - fingerprint mismatch after re-running — determinism itself broke (or the
  *    log was tampered with); either way the replay is not what was recorded.
  */
-export function load(replay: Replay): World {
+export function load(replay: Replay, onStep?: (world: World) => void): World {
   if (replay.simVersion !== SIM_VERSION) {
     throw new ReplayError(
       `replay is sim version ${replay.simVersion}, this build is ${SIM_VERSION} — ` +
@@ -102,7 +105,24 @@ export function load(replay: Replay): World {
     bucket.push({ critterId, intent });
     byTick.set(tick, bucket);
   }
-  for (let t = 1; t <= replay.ticks; t++) world.step(byTick.get(t));
+  const startlesByTick = new Map<number, { x: number; y: number }[]>();
+  for (const { tick, x, y } of replay.startleLog ?? []) {
+    const bucket = startlesByTick.get(tick) ?? [];
+    bucket.push({ x, y });
+    startlesByTick.set(tick, bucket);
+  }
+
+  // A startle logged at tick T landed after step T, so it is re-applied before
+  // step T+1 — including T=0, before the first step.
+  const applyStartles = (tick: number) => {
+    for (const { x, y } of startlesByTick.get(tick) ?? []) world.startleAt(x, y);
+  };
+  applyStartles(0);
+  for (let t = 1; t <= replay.ticks; t++) {
+    world.step(byTick.get(t));
+    onStep?.(world);
+    applyStartles(t);
+  }
 
   const fingerprint = world.fingerprint();
   if (fingerprint !== replay.fingerprint) {

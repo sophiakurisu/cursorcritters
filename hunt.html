@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cursor Critters — the hunt</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="setup" class="panel">
+        <h1>The hunt</h1>
+        <p>
+          Load one or more recorded sessions (the <code>save</code> files from the
+          garden). They must share a seed and configuration. Some of the critters
+          you are about to watch were played by humans with secret objectives.
+          Click a critter to accuse it. You will not be told whether you were
+          right until the end.
+        </p>
+        <input id="files" type="file" accept="application/json" multiple />
+        <p id="setup-error" class="error" hidden></p>
+        <button id="start" disabled>start the hunt</button>
+      </div>
+
+      <canvas id="garden" hidden></canvas>
+
+      <div id="hud" hidden>
+        <span class="pill" id="clock">—</span>
+        <span class="pill" id="accusedCount">accused 0</span>
+        <span class="spacer"></span>
+        <button id="pause" title="Space">pause</button>
+        <button id="speed" title="cycle sim speed">1×</button>
+        <button id="finish" title="stop watching and see the reveal">end hunt</button>
+      </div>
+
+      <div id="accuse" class="panel floating" hidden>
+        <p>Accuse this critter — how sure are you?</p>
+        <div class="row">
+          <button data-conf="1">1 · hunch</button>
+          <button data-conf="2">2</button>
+          <button data-conf="3">3</button>
+          <button data-conf="4">4</button>
+          <button data-conf="5">5 · certain</button>
+        </div>
+        <button id="accuse-cancel">never mind</button>
+      </div>
+
+      <div id="reveal" class="panel" hidden>
+        <h1>The reveal</h1>
+        <p id="reveal-summary"></p>
+        <ul id="reveal-list"></ul>
+        <div class="row">
+          <button id="report">download hunt report</button>
+          <button id="again">hunt again</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/hunt/main.ts"></script>
+  </body>
+</html>

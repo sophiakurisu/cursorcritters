@@ -1,6 +1,17 @@
 import type { Critter, Garden, Species, Vec } from "../sim/types.js";
-import type { World } from "../sim/sim.js";
-import { eventFocus, type EventPhase } from "../sim/objectives.js";
+import { eventFocus, type ActiveEvents, type EventPhase } from "../sim/objectives.js";
+
+/**
+ * What the renderer needs from a world — satisfied by `World` and by the
+ * hunt's ghost-composited world alike. The renderer must not care which it is
+ * drawing: a hunt garden that rendered differently would be a leak.
+ */
+export interface Scene {
+  garden: Garden;
+  critters: readonly Critter[];
+  tick: number;
+  events: ActiveEvents;
+}
 
 const PALETTE = {
   grassA: "#7fa653",
@@ -34,6 +45,8 @@ export class Renderer {
    * interface must never set this, or there is nothing to hunt.
    */
   highlightId: number | null = null;
+  /** Critters the Hunter has accused — marked so they aren't accused twice. */
+  marks: ReadonlySet<number> | null = null;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
@@ -55,7 +68,7 @@ export class Renderer {
     this.canvas.height = Math.floor(cssH * this.dpr);
   }
 
-  draw(world: World): void {
+  draw(world: Scene): void {
     const { ctx } = this;
     const { garden } = world;
     const scale = this.canvas.width / garden.width;
@@ -80,6 +93,19 @@ export class Renderer {
       if (me) this.drawHighlight(me);
     }
 
+    if (this.marks) {
+      for (const c of world.critters) {
+        if (!this.marks.has(c.id)) continue;
+        ctx.save();
+        ctx.strokeStyle = "rgba(214, 88, 70, 0.9)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(c.pos.x, c.pos.y, 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     ctx.restore();
   }
 
@@ -88,7 +114,7 @@ export class Renderer {
    * geography is learnable, with a pulse during the warning and a steady ring
    * while the window is open — the 2D stand-in for conch, bells and volcano.
    */
-  private drawFoci(world: World): void {
+  private drawFoci(world: Scene): void {
     const { ctx } = this;
     const g = world.garden;
 
@@ -128,7 +154,7 @@ export class Renderer {
     }
   }
 
-  private drawEventRing(world: World, ev: EventPhase): void {
+  private drawEventRing(world: Scene, ev: EventPhase): void {
     const { ctx } = this;
     const focus: Vec = eventFocus(world.garden, ev.def);
     const open = ev.phase === "open";

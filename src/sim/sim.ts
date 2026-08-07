@@ -23,6 +23,15 @@ export interface Population {
 
 export const DEFAULT_POPULATION: Population = { ground: 8, tree: 7, water: 5 };
 
+/** A world's configuration with every default resolved — what replays carry. */
+export interface ResolvedWorldConfig {
+  seed: string;
+  population: Population;
+  tuning: Tuning;
+  humans: Population;
+  objectivePressure: ObjectivePressure;
+}
+
 export interface WorldConfig {
   seed: string;
   population?: Population;
@@ -68,6 +77,14 @@ export class World {
   readonly inputLog: InputRecord[] = [];
 
   /**
+   * Startles, logged like inputs: a startle mid-recording that the replay
+   * could not reproduce would make the session refuse to load (correctly, but
+   * uselessly). `tick` is the tick the startle landed *after* — load() applies
+   * it before stepping the next one.
+   */
+  readonly startleLog: { tick: number; x: number; y: number }[] = [];
+
+  /**
    * Objective windows hit and missed by the human critters — the raw feed for
    * 0.6's instrumentation, and deterministic alongside everything else.
    */
@@ -86,7 +103,7 @@ export class World {
    * Replays serialise it verbatim: `{simVersion, config, inputLog}` must be
    * everything needed to rebuild this session, so nothing here may be implied.
    */
-  readonly config: Required<WorldConfig>;
+  readonly config: ResolvedWorldConfig;
 
   constructor(config: WorldConfig) {
     this.seed = config.seed;
@@ -165,8 +182,10 @@ export class World {
     this.inputLog.push({ tick: this.tick, critterId, intent: copy });
   }
 
-  /** Scatter ground critters near a point. Used by the dev harness only. */
+  /** Scatter ground critters near a point. Dev-harness affordance, but logged
+   * so a session containing one still replays exactly. */
   startleAt(x: number, y: number): void {
+    this.startleLog.push({ tick: this.tick, x, y });
     startle(this.critters, { x, y }, this.garden, this.worldRng);
   }
 

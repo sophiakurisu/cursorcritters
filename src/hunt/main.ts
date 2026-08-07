@@ -1,0 +1,212 @@
+import "../style.css";
+import { Renderer } from "../render/render.js";
+import { TICK_HZ } from "../sim/sim.js";
+import type { Replay } from "../sim/replay.js";
+import { HuntWorld, type Accusation } from "./hunt.js";
+
+/**
+ * Phase B (step 0.5): watch, accuse, reveal. The page holds three screens —
+ * setup (load session files), the hunt itself, and the reveal — and leaks
+ * nothing mid-hunt: no correctness feedback, no "you" rings, no ghost tint.
+ */
+
+const setupEl = document.querySelector<HTMLElement>("#setup")!;
+const filesEl = document.querySelector<HTMLInputElement>("#files")!;
+const setupErrorEl = document.querySelector<HTMLElement>("#setup-error")!;
+const startBtn = document.querySelector<HTMLButtonElement>("#start")!;
+const canvas = document.querySelector<HTMLCanvasElement>("#garden")!;
+const hudEl = document.querySelector<HTMLElement>("#hud")!;
+const clockEl = document.querySelector<HTMLElement>("#clock")!;
+const accusedCountEl = document.querySelector<HTMLElement>("#accusedCount")!;
+const pauseBtn = document.querySelector<HTMLButtonElement>("#pause")!;
+const speedBtn = document.querySelector<HTMLButtonElement>("#speed")!;
+const finishBtn = document.querySelector<HTMLButtonElement>("#finish")!;
+const accuseEl = document.querySelector<HTMLElement>("#accuse")!;
+const accuseCancelBtn = document.querySelector<HTMLButtonElement>("#accuse-cancel")!;
+const revealEl = document.querySelector<HTMLElement>("#reveal")!;
+const revealSummaryEl = document.querySelector<HTMLElement>("#reveal-summary")!;
+const revealListEl = document.querySelector<HTMLElement>("#reveal-list")!;
+const reportBtn = document.querySelector<HTMLButtonElement>("#report")!;
+const againBtn = document.querySelector<HTMLButtonElement>("#again")!;
+
+const SPEEDS = [1, 2, 4, 0.25] as const;
+const STEP_MS = 1000 / TICK_HZ;
+const MAX_CATCHUP_STEPS = 8;
+
+const renderer = new Renderer(canvas);
+let hunt: HuntWorld | null = null;
+let replays: Replay[] = [];
+let paused = false;
+let speedIndex = 0;
+let accumulator = 0;
+let last = performance.now();
+let suspectId: number | null = null;
+const accused = new Set<number>();
+
+filesEl.addEventListener("change", async () => {
+  setupErrorEl.hidden = true;
+  startBtn.disabled = true;
+  const files = Array.from(filesEl.files ?? []);
+  if (files.length === 0) return;
+  try {
+    replays = await Promise.all(
+      files.map(async (f) => JSON.parse(await f.text()) as Replay)
+    );
+    // Validate now, so a bad file fails at the door instead of mid-setup.
+    new HuntWorld(replays);
+    startBtn.disabled = false;
+  } catch (err) {
+    setupErrorEl.textContent = err instanceof Error ? err.message : String(err);
+    setupErrorEl.hidden = false;
+  }
+});
+
+startBtn.addEventListener("click", () => {
+  try {
+    hunt = new HuntWorld(replays);
+  } catch (err) {
+    setupErrorEl.textContent = err instanceof Error ? err.message : String(err);
+    setupErrorEl.hidden = false;
+    return;
+  }
+  accused.clear();
+  renderer.marks = accused;
+  setupEl.hidden = true;
+  revealEl.hidden = true;
+  canvas.hidden = false;
+  hudEl.hidden = false;
+  renderer.resize(hunt.garden);
+  accumulator = 0;
+  last = performance.now();
+  requestAnimationFrame(frame);
+});
+
+function frame(now: number): void {
+  if (!hunt || !revealEl.hidden) return;
+  const elapsed = Math.min(now - last, 250);
+  last = now;
+
+  if (!paused && suspectId === null) {
+    accumulator += elapsed * SPEEDS[speedIndex]!;
+    let steps = 0;
+    while (accumulator >= STEP_MS && steps < MAX_CATCHUP_STEPS && !hunt.done) {
+      hunt.step();
+      accumulator -= STEP_MS;
+      steps++;
+    }
+    if (steps === MAX_CATCHUP_STEPS) accumulator = 0;
+  }
+
+  renderer.draw(hunt);
+  if (hunt.tick % 6 === 0) refreshHud();
+  if (hunt.done) return reveal();
+  requestAnimationFrame(frame);
+}
+
+function refreshHud(): void {
+  if (!hunt) return;
+  const left = Math.max(0, Math.ceil((hunt.huntTicks - hunt.tick) / TICK_HZ));
+  clockEl.textContent = `${left}s left`;
+  accusedCountEl.textContent = `accused ${accused.size}`;
+}
+
+// Click a critter to open the confidence panel. The sim pauses while it is
+// open — accusation is a considered act, not a reflex-timing minigame.
+canvas.addEventListener("pointerdown", (e) => {
+  if (!hunt || suspectId !== null) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * hunt.garden.width;
+  const y = ((e.clientY - rect.top) / rect.height) * hunt.garden.height;
+  let best: number | null = null;
+  let bestD = 22;
+  for (const c of hunt.critters) {
+    const d = Math.hypot(c.pos.x - x, c.pos.y - y);
+    if (d < bestD && !accused.has(c.id)) {
+      best = c.id;
+      bestD = d;
+    }
+  }
+  if (best === null) return;
+  suspectId = best;
+  accuseEl.hidden = false;
+});
+
+accuseEl.querySelectorAll<HTMLButtonElement>("button[data-conf]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (hunt && suspectId !== null) {
+      hunt.accuse(suspectId, Number(btn.dataset.conf) as Accusation["confidence"]);
+      accused.add(suspectId);
+      refreshHud();
+    }
+    suspectId = null;
+    accuseEl.hidden = true;
+  });
+});
+
+accuseCancelBtn.addEventListener("click", () => {
+  suspectId = null;
+  accuseEl.hidden = true;
+});
+
+pauseBtn.addEventListener("click", () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? "play" : "pause";
+});
+
+speedBtn.addEventListener("click", () => {
+  speedIndex = (speedIndex + 1) % SPEEDS.length;
+  speedBtn.textContent = `${SPEEDS[speedIndex]}×`;
+});
+
+finishBtn.addEventListener("click", () => reveal());
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !hudEl.hidden) {
+    e.preventDefault();
+    pauseBtn.click();
+  }
+});
+
+window.addEventListener("resize", () => hunt && renderer.resize(hunt.garden));
+
+function reveal(): void {
+  if (!hunt) return;
+  canvas.hidden = true;
+  hudEl.hidden = true;
+  accuseEl.hidden = true;
+  revealEl.hidden = false;
+
+  const report = hunt.report();
+  const hits = report.accusations.filter((a) => a.wasHuman).length;
+  const chance = report.humanCount / report.critterCount;
+  revealSummaryEl.textContent =
+    `${report.humanCount} of the ${report.critterCount} critters were human. ` +
+    `You accused ${report.accusations.length} and caught ${hits}. ` +
+    `Random clicking would catch ~${Math.round(chance * 100)}% per accusation.`;
+
+  revealListEl.innerHTML = "";
+  for (const a of report.accusations) {
+    const li = document.createElement("li");
+    const recent = a.recentVerbs
+      .slice(-6)
+      .map((r) => `${r.verb} ${(r.ticks / TICK_HZ).toFixed(1)}s`)
+      .join(" → ");
+    li.textContent = `${a.wasHuman ? "✓ human" : "✗ NPC"} — critter ${a.critterId}, ` +
+      `confidence ${a.confidence}, at ${Math.round(a.tick / TICK_HZ)}s. Before: ${recent}`;
+    revealListEl.append(li);
+  }
+}
+
+reportBtn.addEventListener("click", () => {
+  if (!hunt) return;
+  const blob = new Blob([JSON.stringify(hunt.report())], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `hunt-${hunt.world.seed}-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+againBtn.addEventListener("click", () => {
+  location.reload();
+});

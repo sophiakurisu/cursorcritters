@@ -105,11 +105,25 @@ Sessions serialise as `{ simVersion, seed, tuning, inputLog }`.
 > artefact. Checkpoints (roadmap Rule 5) are deferred until sessions outgrow
 > re-simulation from tick zero, which 30–180s gardens have not.
 
-### 0.5 — Hunt interface
+### 0.5 — Hunt interface ✅ *(landed 2026-08-07)*
 
 Watch a garden assembled from recorded human sessions mixed with fresh NPCs;
 accuse; record confidence per accusation. This is the async structure from the
 protocol — two single-player sessions, no netcode, no concurrency.
+
+> **As built** (`src/hunt/`, `hunt.html`): recorded humans are **ghosts** — a
+> session's human trajectory is captured tick-for-tick by verified replay
+> (`load` with an onStep hook) and played over a fresh NPC-only world on the
+> same seed. Re-simulating inputs in a merged world would drift (human RNG
+> streams depend on spawn index); ghost playback is exact, and NPC streams are
+> independent of humans, so the NPCs are the ones every recorder saw (tested).
+> Ghost ids continue the NPC id sequence exactly as live humans' would.
+> Sessions must share seed/population/tuning; who was human and their pressure
+> may differ. The hunt clamps to the shortest recording. Accusations pause the
+> sim, take a 1–5 confidence, give no feedback until the reveal, and carry the
+> accused critter's last 15s of verbs — the tell inventory's raw material —
+> into a downloadable hunt report. Startles are now logged and replayed, so a
+> startled recording still verifies.
 
 ### 0.6 — Instrumentation
 

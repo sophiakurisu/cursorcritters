@@ -87,6 +87,19 @@ describe("replay round-trip", () => {
     expect(() => load(edited)).toThrow(/config hash/);
   });
 
+  it("round-trips a session containing startles", () => {
+    const w = new World({ seed: "startle-session", humans: { ground: 1 } });
+    for (let i = 0; i < 200; i++) w.step();
+    w.startleAt(w.garden.width / 2, w.garden.height / 2);
+    for (let i = 0; i < 400; i++) w.step();
+    w.startleAt(100, 100);
+    for (let i = 0; i < 200; i++) w.step();
+
+    const restored = load(JSON.parse(JSON.stringify(serialise(w))));
+    expect(restored.fingerprint()).toBe(w.fingerprint());
+    expect(restored.startleLog).toEqual(w.startleLog);
+  });
+
   it("refuses a tampered input log", () => {
     const replay = serialise(playSession());
     expect(replay.inputLog.length).toBeGreaterThan(10);
