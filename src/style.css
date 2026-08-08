@@ -17,6 +17,11 @@
   box-sizing: border-box;
 }
 
+/* Our display rules (canvas, #hud) must never beat the hidden attribute. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -181,4 +186,19 @@ button:active {
 input[type="file"] {
   font-size: 12px;
   margin: 8px 0;
+}
+
+.small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.big {
+  font-size: 26px;
+  letter-spacing: 2px;
+  margin: 6px 0;
+}
+
+.panel a {
+  color: inherit;
 }

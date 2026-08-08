@@ -39,6 +39,15 @@ protocol §8 async daily — *"some of these critters were human yesterday; find
 them"* — catalogued as a minigame candidate in the MinigamesAI repo
 (`games/WHOS-HUMAN.md`).
 
+**The minigame front door is [/daily](https://cursorcritters.pages.dev/daily)** —
+the one-tap flow: play 90 seconds in today's shared garden (auto-submitted to
+the pool if you actually engaged your objective; AFK sessions are politely
+declined), then hunt yesterday's garden, then the reveal with a score
+(+confidence for catches, −confidence for false accusations), a streak, and a
+copyable share card. Before any real sessions exist, hunts fall back to
+synthesized bot gardens — those hunts never submit reports, so cold-start play
+can't pollute the experiment data.
+
 What remains is people: the protocol wants ≥20 hunt sessions and ≥60
 judgements before the gate is read. For the parameter sweep specifically,
 `pnpm sweep plan https://cursorcritters.pages.dev/` prints the collection

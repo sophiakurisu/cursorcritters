@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         garden: page("index.html"),
         hunt: page("hunt.html"),
+        daily: page("daily.html"),
       },
     },
   },

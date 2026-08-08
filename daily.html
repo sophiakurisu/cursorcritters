@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Who's Human? — the daily</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="intro" class="panel">
+        <h1>Who's Human?</h1>
+        <p id="intro-date">—</p>
+        <p>
+          <strong>Step 1 — be a critter (90s).</strong> You'll be one animal in a
+          garden of AI critters, with a secret objective. Move like they move.
+          When the ring appears and the crowd gathers, that's your moment: doing
+          your job on time <em>is</em> the disguise.
+        </p>
+        <p>
+          <strong>Step 2 — find yesterday's humans.</strong> Watch yesterday's
+          garden. Some critters were played by people doing step 1. Click to
+          accuse; say how sure you are. Wrong guesses cost points.
+        </p>
+        <p id="intro-streak" hidden></p>
+        <button id="begin">play today's garden</button>
+        <p class="small">
+          controls: click to move · G graze · F pick fruit · D drop · V dive · R drift
+          — your critter obeys the same rules the AI does, nothing more.
+        </p>
+      </div>
+
+      <canvas id="garden" hidden></canvas>
+
+      <div id="hud" hidden>
+        <span class="pill" id="clock">—</span>
+        <span class="pill" id="you" hidden>—</span>
+        <span class="pill" id="goal" hidden>—</span>
+        <span class="spacer"></span>
+        <span class="pill" id="accusedCount" hidden>accused 0</span>
+        <button id="finish" hidden>done watching</button>
+      </div>
+
+      <div id="interlude" class="panel" hidden>
+        <h1>Session over</h1>
+        <p id="interlude-msg">—</p>
+        <button id="to-hunt">hunt yesterday's garden →</button>
+      </div>
+
+      <div id="accuse" class="panel floating" hidden>
+        <p>Accuse this critter — how sure are you?</p>
+        <div class="row">
+          <button data-conf="1">1 · hunch</button>
+          <button data-conf="2">2</button>
+          <button data-conf="3">3</button>
+          <button data-conf="4">4</button>
+          <button data-conf="5">5 · certain</button>
+        </div>
+        <button id="accuse-cancel">never mind</button>
+      </div>
+
+      <div id="reveal" class="panel" hidden>
+        <h1>The reveal</h1>
+        <p id="reveal-summary">—</p>
+        <p id="reveal-emojis" class="big">—</p>
+        <ul id="reveal-list"></ul>
+        <div class="row">
+          <button id="share">copy share card</button>
+          <button id="again">back to start</button>
+        </div>
+        <p class="small">
+          the full experiment harness lives at <a href="./index.html">the garden</a>
+          and <a href="./hunt.html">the hunt</a>
+        </p>
+      </div>
+    </div>
+    <script type="module" src="/src/daily/main.ts"></script>
+  </body>
+</html>
