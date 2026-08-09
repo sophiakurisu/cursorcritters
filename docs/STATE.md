@@ -11,7 +11,7 @@ whoever or whatever picks the work up next.
    sim version. Never trust a number written in prose; that command derives
    them from the deployment every time.
 2. Read **Next** below for intent, then **Invariants** before touching code.
-3. `pnpm typecheck && pnpm test` — 72 tests. Green means the world is as
+3. `pnpm typecheck && pnpm test` — 76 tests. Green means the world is as
    described.
 
 **The rule that keeps this true:** update this file *in the same commit* as the
@@ -44,11 +44,12 @@ cache; re-check before concluding a purge failed.
 
 Ordered by what actually moves the project, not by engineering interest.
 
-1. **Presentation pass** — upgrade #5 in `games/WHOS-HUMAN.md`, the only
-   unstarted retention item. The critters are deliberately ugly test shapes.
-   Nobody clips an ugly game, and clips are the recruitment channel the gate is
-   blocked on, so charm is now the critical path. **Render-only** (see
-   Invariants).
+1. **Recruitment.** Every retention feature on the list is now built; the
+   pool is still empty. Nothing in this repository is the bottleneck, and
+   building more of it is the most comfortable way to avoid the actual
+   problem. What is needed is people playing
+   [/daily](https://cursorcritters.pages.dev/daily) — 20 hunt sessions and 60
+   judgements of it.
 2. **"Better than N%"** — upgrade #3, the last partial one. Needs a server-side
    aggregate endpoint over submitted reports. Meaningless until real sessions
    exist, so it follows recruitment rather than leading it.
@@ -113,6 +114,12 @@ preferences.
 
 Newest first. One line per session: what changed, and what it cost or unlocked.
 
+- **2026-08-09** — Presentation pass (upgrade #5, the last unstarted retention
+  item): per-species silhouettes, distance-driven limb cycles, reeds and lily
+  pads. Found and fixed a real confound on the way — draw order followed array
+  order, and since `HuntWorld` appends ghosts after NPCs, every recorded human
+  was painted on top of any NPC it overlapped. Depth sorting fixes it and looks
+  better; `drawOrder` is now tested against ever depending on `id` again.
 - **2026-08-09** — Added this file and `pnpm status` (+9 tests) so a crash
   stops costing context. Verified post-crash: repos clean, 63 tests green,
   three pages live, collection path smoke-tested. Pool still empty.
