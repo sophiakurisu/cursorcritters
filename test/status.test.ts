@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GATE, gateStatus, renderStatus } from "../src/status/gate.js";
+import { GATE, gateStatus, outlook, renderStatus } from "../src/status/gate.js";
 import type { Accusation, HuntReport } from "../src/hunt/hunt.js";
 
 /**
@@ -93,19 +93,50 @@ describe("gate status", () => {
   });
 });
 
+const day = (stamp: string, sessions: number) => ({
+  stamp,
+  seed: `daily-${stamp}`,
+  sessions,
+});
+
+/**
+ * The two-day dependency is the least obvious thing about this experiment and
+ * the easiest to plan around wrongly, so it is pinned rather than merely
+ * commented.
+ */
+describe("what a day of play can contribute", () => {
+  it("says plainly that nothing counts while yesterday's pool is empty", () => {
+    const out = outlook(day("2026-08-09", 7), day("2026-08-08", 0));
+    expect(out).toContain("Nothing played today can move either counter");
+    expect(out).toContain("tomorrow");
+  });
+
+  it("still says so when nobody has played today either", () => {
+    const out = outlook(day("2026-08-09", 0), day("2026-08-08", 0));
+    expect(out).toContain("Nothing played today can move either counter");
+    expect(out).toContain("the day after someone plays");
+  });
+
+  it("confirms hunts report once yesterday's pool is fed", () => {
+    const out = outlook(day("2026-08-09", 2), day("2026-08-08", 5));
+    expect(out).toContain("do report");
+    expect(out).not.toContain("Nothing played today");
+  });
+
+  it("treats a missing yesterday as an empty one rather than assuming the best", () => {
+    expect(outlook(day("2026-08-09", 3), undefined)).toContain("Nothing played today");
+  });
+});
+
 describe("status rendering", () => {
   const snapshot = (sessions: number) => ({
     simVersion: 1,
     gate: gateStatus([]),
-    pools: [{ stamp: "2026-08-09", seed: "daily-2026-08-09", sessions }],
+    pools: [day("2026-08-09", sessions), day("2026-08-08", 0)],
   });
 
-  it("flags an empty pool as falling back to bots", () => {
-    expect(renderStatus(snapshot(0))).toContain("cold-start bots");
-  });
-
-  it("stays quiet about bots once the pool is fed", () => {
-    expect(renderStatus(snapshot(4))).not.toContain("cold-start bots");
+  it("warns that a bot-hunted day cannot move the gate", () => {
+    expect(renderStatus(snapshot(0))).toContain("never report");
   });
 
   it("never prints a detection percentage it is not entitled to", () => {

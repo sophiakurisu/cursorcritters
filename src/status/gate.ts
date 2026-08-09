@@ -124,6 +124,31 @@ export interface Snapshot {
   pools: PoolDay[];
 }
 
+/**
+ * What a day of play can actually contribute to the gate — which is not always
+ * "something", and the reason is easy to miss.
+ *
+ * Both counters are read off hunt reports, and the daily submits a report only
+ * when it hunted a *real* pool: cold-start bot hunts are deliberately never
+ * reported, or synthesized behaviour would contaminate the detection rate. So
+ * on any day whose predecessor's pool was empty, play seeds tomorrow and adds
+ * exactly nothing today. A recruitment push that gets everyone to play once, on
+ * one day, cannot move this experiment at all — it needs consecutive days.
+ */
+export function outlook(today: PoolDay | undefined, yesterday: PoolDay | undefined): string {
+  if (yesterday && yesterday.sessions > 0) {
+    return `Yesterday's pool holds ${yesterday.sessions} session(s), so today's hunts are real and do report.`;
+  }
+  const seeded = today?.sessions ?? 0;
+  return (
+    "Yesterday's pool is empty, so today's hunts run against bots — and bot hunts\n" +
+    "  never report, by design. Nothing played today can move either counter.\n  " +
+    (seeded > 0
+      ? `Today's ${seeded} session(s) become tomorrow's puzzle: the gate can first move tomorrow.`
+      : "The gate can first move the day after someone plays.")
+  );
+}
+
 const pct = (x: number) => `${(100 * x).toFixed(0)}%`;
 
 const bar = (have: number, need: number, width = 24): string => {
@@ -155,10 +180,11 @@ export function renderStatus(s: Snapshot): string {
 
   L.push("");
   L.push("DAILY POOL — yesterday's hiders are today's puzzle");
-  for (const p of s.pools) {
-    const note = p.sessions === 0 ? "  ← empty; hunts fall back to cold-start bots" : "";
-    L.push(`  ${p.stamp}  ${String(p.sessions).padStart(3)} session(s)${note}`);
-  }
+  s.pools.forEach((p, i) => {
+    const role = i === 0 ? "today, seeds tomorrow" : "yesterday, hunted today";
+    L.push(`  ${p.stamp}  ${String(p.sessions).padStart(3)} session(s)   ${role}`);
+  });
+  L.push(`  ${outlook(s.pools[0], s.pools[1])}`);
 
   L.push("");
   L.push(

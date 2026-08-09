@@ -11,7 +11,7 @@ whoever or whatever picks the work up next.
    sim version. Never trust a number written in prose; that command derives
    them from the deployment every time.
 2. Read **Next** below for intent, then **Invariants** before touching code.
-3. `pnpm typecheck && pnpm test` — 76 tests. Green means the world is as
+3. `pnpm typecheck && pnpm test` — 79 tests. Green means the world is as
    described.
 
 **The rule that keeps this true:** update this file *in the same commit* as the
@@ -38,18 +38,34 @@ production on 2026-08-09 (posted under a throwaway seed, confirmed, deleted).
 API.** Note that KV read-back lags a delete by a few seconds behind the edge
 cache; re-check before concluding a purge failed.
 
+### The two-day dependency — read before planning any recruitment
+
+Both gate counters are read off hunt reports, and the daily submits a report
+only when it hunted a *real* pool. Cold-start bot hunts are deliberately never
+reported, because synthesized behaviour in the detection rate would invalidate
+the result. Hunts always target **yesterday's** seed.
+
+So on any day whose predecessor's pool was empty, play seeds tomorrow and
+contributes **exactly nothing** to either counter. **One push, to people who
+each play once, on one day, cannot move this experiment at all.** It needs the
+same people on consecutive days: day one seeds, day two judges.
+
+`pnpm status` prints what the current day can actually contribute — trust it
+over the intuition that "someone played, so the numbers went up".
+
 ---
 
 ## Next
 
 Ordered by what actually moves the project, not by engineering interest.
 
-1. **Recruitment.** Every retention feature on the list is now built; the
-   pool is still empty. Nothing in this repository is the bottleneck, and
-   building more of it is the most comfortable way to avoid the actual
-   problem. What is needed is people playing
+1. **Recruitment, over two consecutive days.** Every retention feature on the
+   list is now built; the pool is still empty. Nothing in this repository is
+   the bottleneck, and building more of it is the most comfortable way to
+   avoid the actual problem. What is needed is people playing
    [/daily](https://cursorcritters.pages.dev/daily) — 20 hunt sessions and 60
-   judgements of it.
+   judgements — and, per the two-day dependency above, **coming back the next
+   day.** Day one produces zeros no matter how many people play.
 2. **"Better than N%"** — upgrade #3, the last partial one. Needs a server-side
    aggregate endpoint over submitted reports. Meaningless until real sessions
    exist, so it follows recruitment rather than leading it.
@@ -114,6 +130,10 @@ preferences.
 
 Newest first. One line per session: what changed, and what it cost or unlocked.
 
+- **2026-08-09** — Traced the data path end to end and found the two-day
+  dependency documented above: day one of any recruitment push produces zeros,
+  because bot hunts never report. `pnpm status` now says so on the day it
+  applies, with tests pinning it.
 - **2026-08-09** — Presentation pass (upgrade #5, the last unstarted retention
   item): per-species silhouettes, distance-driven limb cycles, reeds and lily
   pads. Found and fixed a real confound on the way — draw order followed array
