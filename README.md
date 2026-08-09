@@ -123,6 +123,7 @@ clock that forces NPCs to travel never forces you.
 
 | | |
 |---|---|
+| [`docs/STATE.md`](./docs/STATE.md) | **Where things stand right now** — status, what's next, and the invariants; start here, and run `pnpm status` for the live numbers |
 | [`docs/DESIGN.md`](./docs/DESIGN.md) | What the game is — mechanics, races, missions, economy, and the reasoning behind each |
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | How it gets built — six gated phases and the extensibility contract |
 | [`docs/PHASE-0-PROTOCOL.md`](./docs/PHASE-0-PROTOCOL.md) | The pre-registered balance experiment this repo currently serves |

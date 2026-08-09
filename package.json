@@ -10,6 +10,7 @@
     "test": "vitest run",
     "baseline": "tsx scripts/baseline.ts",
     "analyze": "tsx scripts/analyze.ts",
+    "status": "tsx scripts/status.ts",
     "sweep": "tsx scripts/sweep.ts"
   },
   "devDependencies": {
