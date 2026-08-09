@@ -11,6 +11,7 @@ import {
   previousDayStamp,
   scoreHunt,
   shareText,
+  tomorrowTeaser,
 } from "../src/daily/daily.js";
 import { HuntWorld, type HuntReport } from "../src/hunt/hunt.js";
 import { World } from "../src/sim/sim.js";
@@ -77,6 +78,31 @@ describe("scoring and share", () => {
     expect(text).toContain("+4 pts");
     expect(text).toContain("🔥3");
     expect(text).toContain("cursorcritters.pages.dev/daily");
+  });
+
+  it("puts the two-day mechanic on the share card, where recruits read it", () => {
+    const text = shareText("2026-08-06", scoreHunt(report([{ wasHuman: true, confidence: 4 }])), 3);
+    expect(text).toContain("tomorrow's puzzle");
+  });
+
+  /**
+   * Upgrade #7 is explicit that synthesized cold-start sessions are labelled
+   * honestly in the data and never in the UI. The reveal copy is the one place
+   * that rule is easy to break by accident, so it is pinned.
+   */
+  it("invites the return without ever mentioning bots", () => {
+    for (const pooled of [true, false]) {
+      const text = tomorrowTeaser(pooled).toLowerCase();
+      expect(text).toContain("tomorrow");
+      expect(text).not.toContain("bot");
+      expect(text).not.toContain("synthetic");
+      expect(text).not.toContain("fake");
+    }
+  });
+
+  it("only promises a hunt tomorrow to players who actually joined the pool", () => {
+    expect(tomorrowTeaser(true)).toContain("in tomorrow's garden");
+    expect(tomorrowTeaser(false)).toContain("sat today's puzzle out");
   });
 
   it("streaks grow on consecutive days and reset on gaps", () => {

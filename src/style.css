@@ -199,6 +199,34 @@ input[type="file"] {
   margin: 6px 0;
 }
 
+/* Empty until the day has enough hunters to rank against; :empty keeps the
+   gap from appearing on the days it says nothing. */
+.rank {
+  margin: 2px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.rank:empty {
+  display: none;
+}
+
+/*
+ * The return invitation. A day of play only counts once the player comes back
+ * for a second — so this cannot read as a footnote, and it sits above the
+ * accusation breakdown rather than below it.
+ */
+.cta {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-left: 3px solid currentColor;
+  border-radius: 0 8px 8px 0;
+  background: rgba(127, 166, 83, 0.16);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .panel a {
   color: inherit;
 }

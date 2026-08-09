@@ -13,7 +13,7 @@ import { hashSeed, makeRng } from "../sim/rng.js";
 import { World } from "../sim/sim.js";
 import { dist } from "../sim/garden.js";
 import type { Species } from "../sim/types.js";
-import type { HuntReport } from "../hunt/hunt.js";
+import { betterThanText, type DailyScore, type Standing } from "./score.js";
 
 /** `2026-08-07` for any Date, in UTC — one garden per calendar day, worldwide. */
 export const dayStamp = (d: Date): string => d.toISOString().slice(0, 10);
@@ -61,41 +61,49 @@ export function poolWorthy(world: World): boolean {
   return touched || world.objectives.progressOf(me.id) > 0;
 }
 
-export interface DailyScore {
-  caught: number;
-  humans: number;
-  accusations: number;
-  /** +confidence for a catch, −confidence for a wrongly accused NPC. */
-  score: number;
-  /** One emoji per accusation in order, then ⬜ per human never caught. */
-  emojis: string;
-}
+// Scoring lives in ./score.js so the report API can use it without bundling the
+// simulation; re-exported here because this is where the daily's callers look.
+export { MIN_PEERS, scoreHunt, standing, betterThanText } from "./score.js";
+export type { DailyScore, Standing } from "./score.js";
 
-export function scoreHunt(report: HuntReport): DailyScore {
-  let score = 0;
-  let caught = 0;
-  let emojis = "";
-  for (const a of report.accusations) {
-    if (a.wasHuman) {
-      caught++;
-      score += a.confidence;
-      emojis += "🟩";
-    } else {
-      score -= a.confidence;
-      emojis += "🟥";
-    }
-  }
-  emojis += "⬜".repeat(Math.max(0, report.humanCount - caught));
-  return { caught, humans: report.humanCount, accusations: report.accusations.length, score, emojis };
-}
-
-export function shareText(stamp: string, s: DailyScore, streak: number): string {
+export function shareText(
+  stamp: string,
+  s: DailyScore,
+  streak: number,
+  standing?: Standing | null
+): string {
   const sign = s.score >= 0 ? "+" : "";
+  const rank = standing ? betterThanText(standing) : null;
   return (
     `Who's Human? ${stamp}\n` +
     `${s.emojis} caught ${s.caught}/${s.humans} · ${sign}${s.score} pts · 🔥${streak}\n` +
+    (rank ? `${rank}\n` : "") +
+    // The mechanic *is* the pitch, and it sets the right expectation: someone
+    // arriving from this card needs to know a second day is the point, not an
+    // upsell. Recruiting people for one day cannot work — see docs/STATE.md.
+    `Today's players are tomorrow's puzzle.\n` +
     `https://cursorcritters.pages.dev/daily`
   );
+}
+
+/**
+ * The last thing a player reads, and the only thing standing between this
+ * experiment and a pool that refills.
+ *
+ * A hunt is assembled from *yesterday's* garden, so a day of play with no
+ * previous day behind it contributes nothing but a seed for tomorrow. The
+ * reveal is the emotional peak — the moment to spend on the return, not on
+ * housekeeping.
+ *
+ * Deliberately silent about whether today's hunt was real or cold-start bots:
+ * upgrade #7 labels synthesized sessions honestly *in the data* and never in
+ * the UI, and a player told "those were fakes" has been handed a reason not to
+ * come back.
+ */
+export function tomorrowTeaser(pooled: boolean): string {
+  return pooled
+    ? "Your 90 seconds are in tomorrow's garden now. Come back tomorrow to find out whether anyone caught you — and to hunt the people playing today."
+    : "You sat today's puzzle out, so nobody will be hunting you tomorrow. Play properly tomorrow and you're in.";
 }
 
 export interface StreakState {

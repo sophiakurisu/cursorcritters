@@ -18,6 +18,10 @@ import {
   rollSpecies,
   scoreHunt,
   shareText,
+  standing,
+  betterThanText,
+  tomorrowTeaser,
+  type Standing,
   type StreakState,
 } from "./daily.js";
 
@@ -47,6 +51,8 @@ const accuseCancelBtn = $<HTMLButtonElement>("#accuse-cancel");
 const revealEl = $("#reveal");
 const revealSummaryEl = $("#reveal-summary");
 const revealEmojisEl = $("#reveal-emojis");
+const revealTomorrowEl = $("#reveal-tomorrow");
+const revealStandingEl = $("#reveal-standing");
 const revealListEl = $("#reveal-list");
 const shareBtn = $<HTMLButtonElement>("#share");
 const againBtn = $<HTMLButtonElement>("#again");
@@ -89,6 +95,10 @@ let world: World | null = null;
 let mySpecies: Species = "ground";
 let hunt: HuntWorld | null = null;
 let huntIsSynthetic = false;
+/** Did today's session actually reach the pool? Decides what the reveal promises. */
+let sessionPooled = false;
+/** Set at the reveal once the day's distribution is known; null until then. */
+let myStanding: Standing | null = null;
 let suspectId: number | null = null;
 const accused = new Set<number>();
 const pendingInputs: PlayerInput[] = [];
@@ -168,6 +178,7 @@ async function endPlay(): Promise<void> {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(serialise(world)),
       });
+      sessionPooled = res.ok;
       interludeMsgEl.textContent = res.ok
         ? "You're in. Tomorrow, someone will watch this garden and try to find you."
         : `The server declined your session (${res.status}) — but you can still hunt.`;
@@ -270,7 +281,7 @@ function frame(now: number): void {
   if (scene.tick % 6 === 0) (mode === "play" ? playHud : huntHud)();
 
   if (mode === "play" && world && world.tick >= DAILY_TICKS) return void endPlay();
-  if (mode === "hunt" && hunt && hunt.done) return reveal();
+  if (mode === "hunt" && hunt && hunt.done) return void reveal();
   requestAnimationFrame(frame);
 }
 
@@ -359,7 +370,7 @@ window.addEventListener("resize", () => {
 
 // ── Reveal ─────────────────────────────────────────────────────────────────
 
-function reveal(): void {
+async function reveal(): Promise<void> {
   if (!hunt) return;
   mode = "idle";
   canvas.hidden = true;
@@ -377,6 +388,7 @@ function reveal(): void {
     `You accused ${s.accusations} and caught ${s.caught}, for ${s.score >= 0 ? "+" : ""}${s.score} points. ` +
     `🔥 streak: ${streakNow}.`;
   revealEmojisEl.textContent = s.emojis;
+  revealTomorrowEl.textContent = tomorrowTeaser(sessionPooled);
 
   revealListEl.innerHTML = "";
   for (const a of report.accusations) {
@@ -390,20 +402,35 @@ function reveal(): void {
   }
 
   shareBtn.onclick = () => {
-    void navigator.clipboard.writeText(shareText(yesterday, s, streakNow)).then(() => {
+    void navigator.clipboard.writeText(shareText(yesterday, s, streakNow, myStanding)).then(() => {
       shareBtn.textContent = "copied ✓";
       setTimeout(() => (shareBtn.textContent = "copy share card"), 2000);
     });
   };
 
   // Synthetic (cold-start bot) hunts are for fun; only real gardens report home.
-  if (!huntIsSynthetic) {
-    void fetch("/api/reports", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(report),
-    }).catch(() => undefined);
+  if (huntIsSynthetic) return;
+
+  // Standing is read *before* the report is posted, so nobody is ranked
+  // against themselves. A failure here costs a line of flavour, never the
+  // report — the experiment's data outranks the garnish.
+  try {
+    const res = await fetch(`/api/scores/${encodeURIComponent(report.seed)}`);
+    if (res.ok) {
+      const { scores } = (await res.json()) as { scores: number[] };
+      myStanding = standing(scores, s.score);
+      const line = betterThanText(myStanding);
+      if (line) revealStandingEl.textContent = line;
+    }
+  } catch {
+    // No standing shown. Nothing else changes.
   }
+
+  void fetch("/api/reports", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(report),
+  }).catch(() => undefined);
 }
 
 againBtn.addEventListener("click", () => location.reload());

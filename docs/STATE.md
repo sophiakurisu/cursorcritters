@@ -11,7 +11,7 @@ whoever or whatever picks the work up next.
    sim version. Never trust a number written in prose; that command derives
    them from the deployment every time.
 2. Read **Next** below for intent, then **Invariants** before touching code.
-3. `pnpm typecheck && pnpm test` — 79 tests. Green means the world is as
+3. `pnpm typecheck && pnpm test` — 88 tests. Green means the world is as
    described.
 
 **The rule that keeps this true:** update this file *in the same commit* as the
@@ -66,13 +66,13 @@ Ordered by what actually moves the project, not by engineering interest.
    [/daily](https://cursorcritters.pages.dev/daily) — 20 hunt sessions and 60
    judgements — and, per the two-day dependency above, **coming back the next
    day.** Day one produces zeros no matter how many people play.
-2. **"Better than N%"** — upgrade #3, the last partial one. Needs a server-side
-   aggregate endpoint over submitted reports. Meaningless until real sessions
-   exist, so it follows recruitment rather than leading it.
-3. **Read the gate** — once `pnpm status` says the sample is met, run
+2. **Read the gate** — once `pnpm status` says the sample is met, run
    `pnpm analyze https://cursorcritters.pages.dev` for the full breakdown and
    record the verdict here. Collect the qualitative line from every hunter too:
    §6 is explicit that a number alone is not a pass.
+
+**The upgrade list in `games/WHOS-HUMAN.md` is now finished** — all seven items
+ship. There is no feature left whose absence explains an empty pool.
 
 **Not next, deliberately:** the Phase 0.5 data-driven refactor (SpeciesDef +
 generic stepper). It is the right design and it must wait — see Invariants.
@@ -117,6 +117,11 @@ preferences.
   miniflare's local simulator and will conclude the store is empty when it
   isn't.
 - **`GET /api/reports` is open** unless a Pages env var `ADMIN_KEY` is set.
+- **API:** `POST /api/sessions` (hider submits) · `GET /api/sessions/:seed`
+  (pool listing) · `GET /api/session?k=` (one replay) · `POST|GET /api/reports`
+  (hunt reports; GET gated by `ADMIN_KEY`) · `GET /api/scores/:seed` (the day's
+  score distribution, metadata only — no names, no accusations, because the
+  reveal needs a comparison and a leaderboard would invite gaming the data).
 - **Sibling repo:** `~/CodeProj/minigamesAI` holds `games/WHOS-HUMAN.md`, the
   platform framing and upgrade list. Other files there belong to a parallel
   session — never commit them without checking.
@@ -130,6 +135,12 @@ preferences.
 
 Newest first. One line per session: what changed, and what it cost or unlocked.
 
+- **2026-08-09** — Closed the upgrade list. The reveal now spends its last
+  line inviting the return the two-day dependency requires, and says "better
+  than N%" (upgrade #3) off a new `GET /api/scores/:seed`, which reads the
+  day's distribution from KV metadata written at report time — one list call,
+  no bodies. Below five hunters it says nothing rather than something
+  flattering. Verified live against production, test data purged after.
 - **2026-08-09** — Traced the data path end to end and found the two-day
   dependency documented above: day one of any recruitment push produces zeros,
   because bot hunts never report. `pnpm status` now says so on the day it
