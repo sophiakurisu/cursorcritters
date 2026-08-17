@@ -94,9 +94,22 @@ running these in parallel with Phase 0.
   against the capsule afterwards — a property test found that needs silhouette
   corrections of up to 56%. Derived from the capsule, the correction is zero.
 
-Spikes **1c** (first-person body) and **1d** (NPC brain at scale — port the
-Phase 0 grammars to a 3D navmesh, motion baseline within ±10% of the 2D
-figures) are untouched. The roadmap gates Phase 1 on all four.
+- **1d — NPC brain at scale** (`../spike-1d-brain/RESULTS.md`). 30 NPCs per
+  biome on a 3D navmesh hold the motion baseline within **2.4%** — but only
+  after a fix, and the fix is a rule Phase 2 needs. A literal port **fails**
+  (+14.9% travel share in the forest). Everything follows from the **detour
+  factor**, route length over straight-line distance: 1.09 in open water, 1.31
+  under trees. **Journey distance was never the invariant — duration was.**
+  Derive NPC journey distances from each biome's measured detour and terrain
+  clutter stays a free art decision; author them by hand and every set-dressing
+  change silently retunes this experiment's balance.
+
+Only **1c** (first-person body) is untouched, and it needs a renderer and three
+human testers rather than code. The roadmap gates Phase 1 on all four.
+
+**All three code spikes used this repo's own `pnpm baseline` figures as their
+reference**, so if the Phase 0 sim is ever retuned, their results need
+re-checking — that is the one way work over there can be invalidated from here.
 
 **Not next, deliberately:** the Phase 0.5 data-driven refactor (SpeciesDef +
 generic stepper). It is the right design and it must wait — see Invariants.
@@ -159,6 +172,11 @@ preferences.
 
 Newest first. One line per session: what changed, and what it cost or unlocked.
 
+- **2026-08-17** — Spike 1d (NPC brain at scale) passed after a real failure:
+  porting journey *distance* unchanged inflates forest travel share to +14.9%.
+  Preserving journey *duration* instead — hop divided by the biome's detour
+  factor — lands every biome within 2.4%. Both pinned by tests. Spikes 1a, 1b
+  and 1d are pushed to private GitHub repos.
 - **2026-08-17** — Spike 1b (morph pipeline) passed: 17-byte payloads, clamps
   inescapable by construction, fixed hitbox preserved. A property test killed
   the first clamp table — independently authored ranges needed 56% silhouette
