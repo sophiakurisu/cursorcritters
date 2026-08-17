@@ -74,6 +74,15 @@ Ordered by what actually moves the project, not by engineering interest.
 **The upgrade list in `games/WHOS-HUMAN.md` is now finished** — all seven items
 ship. There is no feature left whose absence explains an empty pool.
 
+**Spike 1a's browser arm is done and passed** — `../spike-1a-crowd`, see its
+`RESULTS.md`. 110 skinned creatures cost ~1.1ms at p95 against a 16.7ms frame,
+and the naive approach only runs out around 880. The roadmap sanctions running
+this in parallel with Phase 0, and it mattered: had it failed, NPC counts would
+have dropped, changing the 5–9-per-hider ratio the balance rests on and forcing
+a Phase 0 re-sweep that would have invalidated data collected up to that point.
+**That risk is now retired.** Open: a mobile-class measurement (a 5–10× slower
+device keeps 110 inside a frame but spends its headroom), and the UE5 arm.
+
 **Not next, deliberately:** the Phase 0.5 data-driven refactor (SpeciesDef +
 generic stepper). It is the right design and it must wait — see Invariants.
 
@@ -135,6 +144,11 @@ preferences.
 
 Newest first. One line per session: what changed, and what it cost or unlocked.
 
+- **2026-08-17** — Ran spike 1a's browser arm in `../spike-1a-crowd`; it passes
+  with ~15× margin. Two measurement traps caught first: the animation-frame
+  clock is pinned to display refresh (a flat 8.3ms on a 120Hz screen regardless
+  of load), and a backgrounded automation tab has frames throttled away
+  entirely, so the run measured nothing at all while appearing to work.
 - **2026-08-09** — Closed the upgrade list. The reveal now spends its last
   line inviting the return the two-day dependency requires, and says "better
   than N%" (upgrade #3) off a new `GET /api/scores/:seed`, which reads the
