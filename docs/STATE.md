@@ -74,14 +74,29 @@ Ordered by what actually moves the project, not by engineering interest.
 **The upgrade list in `games/WHOS-HUMAN.md` is now finished** — all seven items
 ship. There is no feature left whose absence explains an empty pool.
 
-**Spike 1a's browser arm is done and passed** — `../spike-1a-crowd`, see its
-`RESULTS.md`. 110 skinned creatures cost ~1.1ms at p95 against a 16.7ms frame,
-and the naive approach only runs out around 880. The roadmap sanctions running
-this in parallel with Phase 0, and it mattered: had it failed, NPC counts would
-have dropped, changing the 5–9-per-hider ratio the balance rests on and forcing
-a Phase 0 re-sweep that would have invalidated data collected up to that point.
-**That risk is now retired.** Open: a mobile-class measurement (a 5–10× slower
-device keeps 110 inside a frame but spends its headroom), and the UE5 arm.
+**Phase 1 spikes 1a and 1b are done and passed**, both in sibling projects so
+nothing there can touch this collecting deployment. The roadmap sanctions
+running these in parallel with Phase 0.
+
+- **1a — crowd performance** (`../spike-1a-crowd/RESULTS.md`). 110 skinned
+  creatures cost **~1.1ms at p95** against a 16.7ms frame; the naive approach
+  only runs out around 880. This mattered to *this* repo: had it failed, NPC
+  counts would have dropped, changing the 5–9-per-hider ratio the balance rests
+  on and forcing a Phase 0 re-sweep that would have invalidated any data
+  collected by then. **That risk is retired.** Mobile is bounded rather than
+  open — failure needs a device ~15× slower than the dev machine. Open: a real
+  device measurement, and the UE5 arm.
+- **1b — morph pipeline** (`../spike-1b-morph/RESULTS.md`). Morph state is
+  **17 bytes** against a 256-byte budget, illegal bodies are *unrepresentable*
+  rather than merely rejected, and the fixed hitbox is preserved. Its finding
+  is a design constraint worth knowing before Phase 2: **the hitbox dictates
+  the morph range.** Height and width cannot be authored freely and checked
+  against the capsule afterwards — a property test found that needs silhouette
+  corrections of up to 56%. Derived from the capsule, the correction is zero.
+
+Spikes **1c** (first-person body) and **1d** (NPC brain at scale — port the
+Phase 0 grammars to a 3D navmesh, motion baseline within ±10% of the 2D
+figures) are untouched. The roadmap gates Phase 1 on all four.
 
 **Not next, deliberately:** the Phase 0.5 data-driven refactor (SpeciesDef +
 generic stepper). It is the right design and it must wait — see Invariants.
@@ -144,6 +159,10 @@ preferences.
 
 Newest first. One line per session: what changed, and what it cost or unlocked.
 
+- **2026-08-17** — Spike 1b (morph pipeline) passed: 17-byte payloads, clamps
+  inescapable by construction, fixed hitbox preserved. A property test killed
+  the first clamp table — independently authored ranges needed 56% silhouette
+  corrections — so the extent ranges are now derived from the capsule.
 - **2026-08-17** — Ran spike 1a's browser arm in `../spike-1a-crowd`; it passes
   with ~15× margin. Two measurement traps caught first: the animation-frame
   clock is pinned to display refresh (a flat 8.3ms on a 120Hz screen regardless
